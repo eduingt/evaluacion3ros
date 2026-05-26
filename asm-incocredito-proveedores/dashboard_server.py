@@ -670,10 +670,13 @@ def put_config(integration_id: str, body: ConfigUpdate) -> JSONResponse:
         key_id = found["key_id"]
         if body.key:
             os.environ[key_id] = body.key
+            found["_key"] = body.key
             log.info("Config %s: %s updated", integration_id, key_id)
         if found.get("key_id2") and body.key2:
             os.environ[found["key_id2"]] = body.key2
+            found["_key2"] = body.key2
             log.info("Config %s: %s updated", integration_id, found["key_id2"])
+        CONFIG_FILE.write_text(json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8")
     return JSONResponse(content={"status": "ok", "id": integration_id})
 
 

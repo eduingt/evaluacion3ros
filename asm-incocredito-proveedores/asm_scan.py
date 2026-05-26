@@ -924,7 +924,24 @@ def query_osv(techs: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 
 LEAK_API_URL = "https://leak-lookup.com/api/search"
-LEAK_API_KEY = os.environ.get("LEAK_API_KEY", "")
+_CONFIG_FILE = ROOT / "integrations_config.json"
+
+
+def _get_api_key(key_id: str) -> str:
+    env_val = os.environ.get(key_id, "")
+    if env_val:
+        return env_val
+    try:
+        cfg = json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
+        for integ in cfg.get("integrations", []):
+            if integ.get("key_id") == key_id:
+                return integ.get("_key", "")
+    except Exception:
+        pass
+    return ""
+
+
+LEAK_API_KEY = _get_api_key("LEAK_API_KEY")
 
 
 def check_credential_leaks(domain: str) -> list[dict[str, Any]]:

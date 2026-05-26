@@ -6,12 +6,31 @@ import re
 import subprocess
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import requests
 from bs4 import BeautifulSoup
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
+_CONFIG_PATH = Path(__file__).resolve().parent / "integrations_config.json"
+
+
+def _get_key(key_id: str) -> str:
+    env_val = os.environ.get(key_id, "")
+    if env_val:
+        return env_val
+    try:
+        cfg = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+        for integ in cfg.get("integrations", []):
+            if integ.get("key_id") == key_id:
+                return integ.get("_key", "")
+            if integ.get("key_id2") == key_id:
+                return integ.get("_key2", "")
+    except Exception:
+        pass
+    return ""
 
 
 def _log(msg: str) -> None:
@@ -111,7 +130,7 @@ def run_dnsdumpster(domain: str) -> dict:
 
 
 def run_shodan(domain: str) -> dict:
-    api_key = os.environ.get("SHODAN_API_KEY")
+    api_key = _get_key("SHODAN_API_KEY")
     if not api_key:
         return {"error": "SHODAN_API_KEY no configurada", "skipped": True}
     try:
@@ -162,8 +181,8 @@ def run_shodan(domain: str) -> dict:
 
 
 def run_censys(domain: str) -> dict:
-    api_id = os.environ.get("CENSYS_API_ID")
-    api_secret = os.environ.get("CENSYS_API_SECRET")
+    api_id = _get_key("CENSYS_API_ID")
+    api_secret = _get_key("CENSYS_API_SECRET")
     if not api_id or not api_secret:
         return {"error": "CENSYS_API_ID/CENSYS_API_SECRET no configurados", "skipped": True}
     try:
