@@ -366,6 +366,48 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
   </div>
 </div>"""
 
+    def _external_detail(esc_f, ext):
+        if not ext:
+            return ""
+        parts = []
+        whois = ext.get("whois") or {}
+        if "error" not in whois:
+            items = []
+            for k in ("registrar","registrant_organization","registrant_country","creation_date","expiration_date"):
+                if whois.get(k): items.append(f"<li><strong>{k}:</strong> {esc_f(whois[k])}</li>")
+            if whois.get("emails"): items.append(f"<li><strong>emails:</strong> {esc_f(', '.join(whois['emails'][:5]))}</li>")
+            if items:
+                parts.append(f"<h4>WHOIS</h4><ul class='compact'>{''.join(items)}</ul>")
+        dnsd = ext.get("dnsdumpster") or {}
+        if "error" not in dnsd and dnsd.get("host_records"):
+            items = "".join(f"<li><code>{esc_f(r[0])}</code> ({esc_f(', '.join(str(x) for x in r[1:]))})</li>" for r in dnsd["host_records"][:10])
+            parts.append(f"<h4>DNSDumpster</h4><ul class='compact'>{items}</ul>")
+        shodan = ext.get("shodan") or {}
+        if "error" not in shodan and shodan.get("hosts"):
+            ports = list({p2 for h in shodan["hosts"] for p2 in h.get("ports", [])})
+            vulns = list({v for h in shodan["hosts"] for v in h.get("vulns", [])})
+            items = []
+            if ports: items.append(f"<li>Puertos: {esc_f(', '.join(str(p) for p in sorted(ports)[:20]))}</li>")
+            if vulns: items.append(f"<li>Vulnerabilidades: {esc_f(', '.join(vulns[:10]))}</li>")
+            for h in shodan["hosts"][:3]:
+                if h.get("org"): items.append(f"<li>Org: {esc_f(h['org'])} ({esc_f(h.get('country','?'))})</li>")
+            if items:
+                parts.append(f"<h4>Shodan</h4><ul class='compact'>{''.join(items)}</ul>")
+        censys = ext.get("censys") or {}
+        if "error" not in censys:
+            certs = censys.get("certificates") or []
+            if certs:
+                items = "".join(f"<li><code>{esc_f(c.get('fingerprint_sha256','')[:24])}</code></li>" for c in certs[:3])
+                parts.append(f"<h4>Censys ({len(certs)} certificados)</h4><ul class='compact'>{items}</ul>")
+        th = ext.get("theharvester") or {}
+        if "error" not in th:
+            items = []
+            if th.get("emails"): items.append(f"<li>Emails: {esc_f(', '.join(th['emails'][:10]))}</li>")
+            if th.get("subdomains"): items.append(f"<li>Subdominios: {esc_f(', '.join(th['subdomains'][:10]))}</li>")
+            if items:
+                parts.append(f"<h4>theHarvester</h4><ul class='compact'>{''.join(items)}</ul>")
+        return f"<div style='margin-top:6px;'>{''.join(parts)}</div>" if parts else ""
+
     # Provider scores / domain details
     prov_sections = ""
     for p in matrix:
@@ -398,7 +440,11 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
     <span><strong>TAKEOVER:</strong> {esc(len(p.get("takeover_risks") or []))}</span>
     <span><strong>SC-REP:</strong> {"Clean" if p.get("supply_reputation_clean") else "Issues"}</span>
     <span><strong>Social:</strong> {esc(", ".join(p.get("social",{}).keys()) or "-")}</span>
+    <span><strong>WHOIS:</strong> {esc((p.get("external") or {}).get("whois",{}).get("registrar","-"))}</span>
+    <span><strong>Shodan:</strong> {len({p2 for h in ((p.get("external") or {}).get("shodan") or {}).get("hosts",[]) for p2 in h.get("ports",[])})} puertos</span>
+    <span><strong>theH:</strong> {len((p.get("external") or {}).get("theharvester",{}).get("emails",[]))} emails</span>
   </div>
+  {_external_detail(esc, p.get("external") or {})}
 </div>"""
 
     return f"""<!DOCTYPE html>

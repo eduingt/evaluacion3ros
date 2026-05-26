@@ -215,6 +215,52 @@ def classify_issues(m: dict[str, Any], p: dict[str, Any]) -> tuple[list[dict], l
             add("passive", f"Social/{net}", "info", f"@{uname}", domain,
                 _evidence_block(lines, f"Perfil {net}"))
 
+    ext = p.get("external") or {}
+    whois = ext.get("whois") or {}
+    if "error" not in whois:
+        items = []
+        if whois.get("registrar"): items.append(f"Registrar: {whois['registrar']}")
+        if whois.get("registrant_organization"): items.append(f"Org: {whois['registrant_organization']}")
+        if whois.get("registrant_country"): items.append(f"Pais: {whois['registrant_country']}")
+        if whois.get("creation_date"): items.append(f"Creado: {whois['creation_date']}")
+        if whois.get("expiration_date"): items.append(f"Expira: {whois['expiration_date']}")
+        if items:
+            add("passive", "WHOIS", "info", f"Registrado por {whois.get('registrar','?')}", domain,
+                _evidence_block(items, "WHOIS"))
+    shodan = ext.get("shodan") or {}
+    if "error" not in shodan and shodan.get("hosts"):
+        ports = list({p2 for h in shodan["hosts"] for p2 in h.get("ports", [])})
+        vulns = list({v for h in shodan["hosts"] for v in h.get("vulns", [])})
+        items = [f"Puertos: {', '.join(str(p) for p in sorted(ports)[:20])}"]
+        if vulns:
+            items.append(f"Vulnerabilidades: {', '.join(vulns[:10])}")
+        add("passive", "Shodan", "info", f"{len(ports)} puerto(s), {len(vulns)} CVE(s)", domain,
+            _evidence_block(items, "Shodan"))
+    censys = ext.get("censys") or {}
+    if "error" not in censys:
+        certs = censys.get("certificates") or []
+        hosts = censys.get("hosts") or []
+        items = []
+        if certs: items.append(f"Certificados: {len(certs)}")
+        if hosts: items.append(f"Hosts: {len(hosts)}")
+        if items:
+            add("passive", "Censys", "info", "; ".join(items), domain)
+    th = ext.get("theharvester") or {}
+    if "error" not in th:
+        em = th.get("emails") or []
+        sd = th.get("subdomains") or []
+        items = []
+        if em: items.append(f"Emails: {len(em)}")
+        if sd: items.append(f"Subdominios: {len(sd)}")
+        if items:
+            add("passive", "theHarvester", "info", "; ".join(items), domain,
+                _evidence_block((em[:15] if em else []) + (sd[:15] if sd else []), "theHarvester"))
+    dnsd = ext.get("dnsdumpster") or {}
+    if "error" not in dnsd and dnsd.get("host_records"):
+        items = [f"{r[0]} ({', '.join(str(x) for x in r[1:])})" for r in dnsd["host_records"][:15]]
+        add("passive", "DNSDumpster", "info", f"{len(dnsd['host_records'])} registro(s)", domain,
+            _evidence_block(items, "DNSDumpster"))
+
     # --- ACTIVE ---
     p80 = p.get("port_80", {})
     p443 = p.get("port_443", {})

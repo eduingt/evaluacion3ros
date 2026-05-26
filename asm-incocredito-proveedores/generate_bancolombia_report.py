@@ -338,6 +338,55 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
             return ""
         return f"<h4>Cabeceras de Seguridad</h4><ul class='compact'>{''.join(items)}</ul>"
 
+    def _external_block(esc_f, p):
+        ext = p.get("external") or {}
+        parts = []
+        whois = ext.get("whois") or {}
+        if "error" not in whois:
+            items = []
+            if whois.get("registrar"): items.append(f"<li>Registrar: {esc_f(whois['registrar'])}</li>")
+            if whois.get("registrant_organization"): items.append(f"<li>Organizacion: {esc_f(whois['registrant_organization'])}</li>")
+            if whois.get("registrant_country"): items.append(f"<li>Pais: {esc_f(whois['registrant_country'])}</li>")
+            if whois.get("creation_date"): items.append(f"<li>Creado: {esc_f(whois['creation_date'])}</li>")
+            if whois.get("expiration_date"): items.append(f"<li>Expira: {esc_f(whois['expiration_date'])}</li>")
+            if whois.get("emails"): items.append(f"<li>Emails: {esc_f(', '.join(whois['emails'][:5]))}</li>")
+            if items:
+                parts.append(f"<h4>WHOIS</h4><ul class='compact'>{''.join(items)}</ul>")
+        dnsd = ext.get("dnsdumpster") or {}
+        if "error" not in dnsd and dnsd.get("host_records"):
+            items = "".join(f"<li><code>{esc_f(r[0])}</code> ({esc_f(', '.join(r[1:]))})</li>" for r in dnsd["host_records"][:10])
+            parts.append(f"<h4>DNSDumpster</h4><ul class='compact'>{items}</ul>")
+        shodan = ext.get("shodan") or {}
+        if "error" not in shodan and shodan.get("hosts"):
+            ports = list({p2 for h in shodan["hosts"] for p2 in h.get("ports", [])})
+            vulns = list({v for h in shodan["hosts"] for v in h.get("vulns", [])})
+            items = []
+            if ports: items.append(f"<li>Puertos: {esc_f(', '.join(str(p) for p in sorted(ports)[:20]))}</li>")
+            if vulns: items.append(f"<li>Vulnerabilidades: {esc_f(', '.join(vulns[:10]))}</li>")
+            for h in shodan["hosts"][:3]:
+                if h.get("org"): items.append(f"<li>Org: {esc_f(h['org'])} ({esc_f(h.get('country','?'))})</li>")
+            if items:
+                parts.append(f"<h4>Shodan</h4><ul class='compact'>{''.join(items)}</ul>")
+        censys = ext.get("censys") or {}
+        if "error" not in censys:
+            certs = censys.get("certificates") or []
+            if certs:
+                items = "".join(f"<li><code>{esc_f(c.get('fingerprint_sha256','')[:24])}</code> {esc_f(str(c.get('validity',{}).get('start',''))[:10])}</li>" for c in certs[:3])
+                parts.append(f"<h4>Censys ({len(certs)} certificados)</h4><ul class='compact'>{items}</ul>")
+            hosts = censys.get("hosts") or []
+            if hosts:
+                items = "".join(f"<li>{esc_f(h.get('ip','?'))} — {esc_f(', '.join(s.get('service_name','') for s in (h.get('services') or [])[:5]))}</li>" for h in hosts[:3])
+                parts.append(f"<h4>Censys Hosts</h4><ul class='compact'>{items}</ul>")
+        th = ext.get("theharvester") or {}
+        if "error" not in th:
+            items = []
+            if th.get("emails"): items.append(f"<li>Emails: {esc_f(', '.join(th['emails'][:10]))}</li>")
+            if th.get("subdomains"): items.append(f"<li>Subdominios: {esc_f(', '.join(th['subdomains'][:10]))}</li>")
+            if th.get("ips"): items.append(f"<li>IPs: {esc_f(', '.join(th['ips'][:5]))}</li>")
+            if items:
+                parts.append(f"<h4>theHarvester</h4><ul class='compact'>{''.join(items)}</ul>")
+        return "\n".join(parts)
+
     def takeover_block(esc_f, risks):
         if not risks:
             return ""
@@ -508,6 +557,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
   {typo_block(esc, p.get("typosquatting") or [])}
   {patch_block(esc, p.get("patching") or [])}
   {supply_block(esc, p.get("supply_chain") or [])}
+  {_external_block(esc, p)}
   <details>
     <summary class="muted small">Ver cabeceras HTTP</summary>
     <pre class="small">{esc(json.dumps(hdr, indent=2, ensure_ascii=False) if hdr else "{}")}</pre>
