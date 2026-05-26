@@ -924,7 +924,7 @@ def query_osv(techs: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 
 LEAK_API_URL = "https://leak-lookup.com/api/search"
-_CONFIG_FILE = ROOT / "integrations_config.json"
+_CONFIG_FILE = Path(__file__).resolve().parent / "integrations_config.json"
 
 
 def _get_api_key(key_id: str) -> str:
