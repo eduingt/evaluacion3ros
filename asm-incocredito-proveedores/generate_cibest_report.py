@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genera informe PDF ver.grupocibest con identidad grafica de Grupo Cibest.
+Genera informe PDF ver.grupocibest con identidad gráfica de Grupo Cibest.
 Basado en generate_socradar_style_report.py pero con branding propio.
 """
 
@@ -13,6 +13,16 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from pasivo_canon import collect_pasive_items
+from precia_scorecard import render_precialike_block
+from toc_helper import render_toc
+from score_legend import render_score_legend
+
+FORMULA_VERSION = "B3-v2.0"
+FORMULA_DATE = "2026-09-22"
+from resumen_ejecutivo import render_resumen_ejecutivo
+from semi_canon import collect_semi_active_items
 
 ROOT = Path(__file__).resolve().parent
 
@@ -67,95 +77,57 @@ def parse_matrix_row(m: dict[str, Any]) -> dict[str, Any]:
 
 
 def domain_score(p: dict[str, Any]) -> float:
-    pts = 0.0
+    """Benevolo: parte de 100 y resta suave — 100 con higiene básica, baja gradual."""
+    pts = 100.0
     h = p.get("https", {}) or {}
     headers = h.get("headers") or {}
     tls = p.get("tls") or {}
     dns = p.get("dns") or {}
-    if p.get("port_443", {}).get("open"):
-        pts += 8
-    if p.get("port_80", {}).get("open"):
-        pts += 2
-    if isinstance(h.get("status_code"), int) and 200 <= h["status_code"] < 400:
-        pts += 18
-    if headers.get("strict-transport-security"):
-        pts += 12
-    if headers.get("content-security-policy") or headers.get("content-security-policy-report-only"):
-        pts += 10
-    if headers.get("x-frame-options"):
-        pts += 6
-    if headers.get("x-content-type-options"):
-        pts += 4
-    if tls.get("negotiated_version") and not tls.get("error"):
-        pts += 14
-    if tls.get("tls13_only_ok"):
-        pts += 6
-    if dns.get("spf_record") and "-all" in str(dns["spf_record"]).replace(" ", "").lower():
-        pts += 10
-    elif dns.get("spf_record"):
-        pts += 5
-    if dns.get("dmarc_policy") in ("reject", "quarantine"):
-        pts += 10
-    elif dns.get("dmarc_policy"):
-        pts += 5
+    if not p.get("port_443", {}).get("open"): pts -= 6
+    if not (isinstance(h.get("status_code"), int) and 200 <= h["status_code"] < 400): pts -= 4
+    if not headers.get("strict-transport-security"): pts -= 4
+    if not (headers.get("content-security-policy") or headers.get("content-security-policy-report-only")): pts -= 4
+    elif p.get("csp_findings"):
+        csp_f = p.get("csp_findings") or []
+        if any(f.get("severity")=="high" for f in csp_f): pts -= 3
+        elif csp_f: pts -= 2
+    if not headers.get("x-frame-options"): pts -= 2
+    if not headers.get("x-content-type-options"): pts -= 2
+    if tls.get("error") or not tls.get("negotiated_version"): pts -= 6
+    elif not tls.get("tls13_only_ok"): pts -= 2
+    spf = dns.get("spf_record") or ""
+    if not spf: pts -= 4
+    elif "-all" not in spf.replace(" ","").lower(): pts -= 2
+    dmarc_pol = dns.get("dmarc_policy") or ""
+    if not dns.get("dmarc_record"): pts -= 4
+    elif dmarc_pol not in ("reject","quarantine"): pts -= 2
     starttls = dns.get("starttls_results") or []
-    if starttls and all(s.get("starttls") for s in starttls):
-        pts += 5
-    elif starttls:
-        pts += 1
-    ip_reputation = dns.get("ip_reputation") or []
-    if not ip_reputation:
-        pts += 8
-    elif len(ip_reputation) <= 2:
-        pts += 4
+    if starttls and not all(s.get("starttls") for s in starttls): pts -= 2
+    ip_rep = dns.get("ip_reputation") or []
+    if len(ip_rep) >= 1: pts -= 4 if len(ip_rep)>=3 else 2
     urlhaus = p.get("urlhaus") or {}
-    if not urlhaus.get("malicious"):
-        pts += 5
-    elif urlhaus.get("error"):
-        pts += 1
+    if urlhaus.get("malicious"): pts -= 3
     vulns = p.get("vulnerabilities") or []
-    if not vulns:
-        pts += 8
-    elif len(vulns) <= 3:
-        pts += 4
-    leaks = p.get("credential_leaks") or []
-    valid_leaks = [l for l in leaks if "error" not in l]
-    if not valid_leaks:
-        pts += 6
-    elif len(valid_leaks) <= 2:
-        pts += 3
+    if len(vulns) >= 1: pts -= 4 if len(vulns)>=3 else 2
+    leaks = [l for l in (p.get("credential_leaks") or []) if "error" not in l]
+    if len(leaks) >= 1: pts -= 4 if len(leaks)>=3 else 2
     typos = p.get("typosquatting") or []
-    if not typos:
-        pts += 6
-    elif len(typos) <= 2:
-        pts += 3
+    if len(typos) >= 1: pts -= 3 if len(typos)>=3 else 1
     patch = p.get("patching") or []
-    eol_count = sum(1 for x in patch if x.get("status") == "eol")
-    if eol_count == 0:
-        pts += 5
-    elif eol_count <= 1:
-        pts += 2
+    eol = sum(1 for x in patch if x.get("status")=="eol")
+    if eol >= 1: pts -= 3 if eol>=2 else 1
     supply = p.get("supply_chain") or []
-    if not supply:
-        pts += 4
-    elif len(supply) <= 5:
-        pts += 2
+    if len(supply) > 5: pts -= 1
     takeover = p.get("takeover_risks") or []
-    vulnerable = any(r.get("vulnerable") for r in takeover)
-    if not takeover: pts += 6
-    elif not vulnerable: pts += 3
-    csp_f = p.get("csp_findings") or []
-    if not csp_f: pts += 5
-    elif all(f.get("severity") in ("low", "medium") for f in csp_f): pts += 2
+    if any(r.get("vulnerable") for r in takeover): pts -= 5
+    elif len(takeover) >= 1: pts -= 2
     cookie_f = p.get("cookie_findings") or []
-    cookie_insecure = any(f.get("severity") in ("high",) for f in cookie_f)
-    if not cookie_f: pts += 5
-    elif not cookie_insecure: pts += 2
+    if any(f.get("severity")=="high" for f in cookie_f): pts -= 3
+    elif cookie_f: pts -= 1
     scr_dnsbl = p.get("supply_reputation_dnsbl_count", 0)
     scr_urlhaus = p.get("supply_reputation_urlhaus_count", 0)
-    if scr_dnsbl == 0 and scr_urlhaus == 0: pts += 5
-    elif scr_dnsbl <= 2 and scr_urlhaus == 0: pts += 2
-    return min(100.0, round(pts, 2))
+    if scr_dnsbl >= 1 or scr_urlhaus >= 1: pts -= 3 if scr_dnsbl>=2 or scr_urlhaus>=1 else 1
+    return max(0.0, min(100.0, round(pts, 2)))
 
 
 def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -> str:
@@ -220,10 +192,22 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
     total_scr_dnsbl = sum(m.get("supply_reputation_dnsbl_count", 0) for m in matrix)
     total_scr_urlhaus = sum(m.get("supply_reputation_urlhaus_count", 0) for m in matrix)
     if total_scr_dnsbl or total_scr_urlhaus:
-        risk_rows.insert(0, ("Supply Chain Reputation", "IPs o dominios de terceros con reputacion negativa (DNSBL/URLhaus)", total_scr_dnsbl + total_scr_urlhaus, "High"))
+        risk_rows.insert(0, ("Supply Chain Reputation", "IPs o dominios de terceros con reputación negativa (DNSBL/URLhaus)", total_scr_dnsbl + total_scr_urlhaus, "High"))
     total_supply = sum(len(p.get("supply_chain") or []) for p in providers)
     if total_supply:
         risk_rows.insert(0, ("Supply Chain", "Dependencias de terceros detectadas (CSP/scripts)", total_supply, "Low"))
+    total_fr_js = sum(len((p.get("finalrecon") or {}).get("javascripts") or []) + len(((p.get("finalrecon") or {}).get("wayback") or {}).get("js_files") or []) for p in providers)
+    if total_fr_js:
+        risk_rows.insert(0, ("Application Security", f"Archivos JavaScript expuestos ({total_fr_js})", total_fr_js, "Medium"))
+    total_fr_api = sum(len(((p.get("finalrecon") or {}).get("wayback") or {}).get("api_endpoints") or []) for p in providers)
+    if total_fr_api:
+        risk_rows.insert(0, ("Information Leak", f"Endpoints API en Wayback Machine ({total_fr_api})", total_fr_api, "High"))
+    total_fr_params = sum(len(((p.get("finalrecon") or {}).get("wayback") or {}).get("juicy_params") or []) for p in providers)
+    if total_fr_params:
+        risk_rows.insert(0, ("Information Leak", f"Parametros sensibles en Wayback Machine ({total_fr_params})", total_fr_params, "Medium"))
+    total_fr_sitemap = sum(len((p.get("finalrecon") or {}).get("sitemap") or []) for p in providers)
+    if total_fr_sitemap:
+        risk_rows.insert(0, ("Information Leak", f"Sitemap expuesto ({total_fr_sitemap} URLs)", total_fr_sitemap, "Low"))
 
     def risk_table_rows() -> str:
         out = []
@@ -249,6 +233,13 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
 
     grade = grade_from_trust(trust)
 
+    # Resumen Ejecutivo canónico (estilo Beta1) — usa mismo trust que el informe
+    resumen_block = render_resumen_ejecutivo(providers, asm, score_general=int(trust), fecha_str=gen, org="Incocredito", analista="@eduingt")
+
+    
+    score_legend_block = render_score_legend()    # Precia-like scorecard (estilo SecurityScorecard)
+    precia_blocks = "\n".join(render_precialike_block(pr, analista="@eduingt", org=pr.get("name") or pr.get("domain",""), generated=gen) for pr in providers)
+
     def vuln_block(esc_f, vulns):
         if not vulns:
             return ""
@@ -256,7 +247,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
             f'<li><span class="cve-badge">{esc_f(v.get("cve_id", v.get("id", "?")))}</span>'
             f' {esc_f(v.get("summary", "")[:120])}'
             f' <span class="muted">({esc_f(v.get("package", ""))})</span></li>'
-            for v in vulns[:10]
+            for v in vulns
         )
         if len(vulns) > 10:
             items += f'<li class="muted">... y {len(vulns) - 10} mas</li>'
@@ -267,7 +258,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
             return ""
         items = "".join(
             f"<li><code>{esc_f(t.get('domain', ''))}</code> {esc_f(', '.join(t.get('ips', [])))}</li>"
-            for t in typos[:10]
+            for t in typos
         )
         return f"<h4>Typosquatting detectados</h4><ul class='compact'>{items}</ul>"
 
@@ -278,7 +269,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
         warn_mark = chr(9888)
         err_mark = chr(10007)
         items = ""
-        for pch in patching[:10]:
+        for pch in patching:
             status = pch.get("status", "")
             if status == "current":
                 icon = f'<span class="ok">{ok_mark}</span>'
@@ -292,16 +283,74 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
     def supply_block(esc_f, supply):
         if not supply:
             return ""
-        ok_mark = chr(10003)
-        err_mark = chr(10007)
-        items = ""
-        for s in (supply or [])[:10]:
-            status_html = '<span class="ok">' + ok_mark + ' resuelve</span>' if s.get("resolves") else '<span class="err">' + err_mark + ' no resuelve</span>'
-            ips_str = esc_f(", ".join(s.get("ips", [])[:3]) or "")
-            items += f'<li><code>{esc_f(s.get("domain", ""))}</code> <span class="muted">({s.get("source", "?")})</span> {status_html} {ips_str}</li>'
+        items = "".join(
+            f"<li><code>{esc_f(s.get('domain', ''))}</code> ({s.get('source', '?')}) — {'✓ resuelve' if s.get('resolves') else '✗ no resuelve'} {esc_f(', '.join(s.get('ips', [])[:3]) or '')}</li>"
+            for s in supply
+        )
         if len(supply) > 10:
-            items += f'<li class="muted">... y {len(supply) - 10} mas</li>'
+            items += f"<li class='muted'>… y {len(supply) - 10} más</li>"
         return f"<h4>Dependencias de terceros (Supply Chain)</h4><ul class='compact'>{items}</ul>"
+
+    def cve_block(esc_f, cve_findings):
+        if not cve_findings:
+            return ""
+        items = "".join(
+            f"<li><strong>{esc_f(c.get('id', '?'))}</strong> — {esc_f(c.get('title', '')[:150])} "
+            f"<span class='muted'>[{esc_f(c.get('type', ''))}] Puerto {c.get('port', '?')} / {esc_f(c.get('product', ''))}</span></li>"
+            for c in cve_findings
+        )
+        if len(cve_findings) > 20:
+            items += f"<li class='muted'>… y {len(cve_findings) - 20} más</li>"
+        return f"<h4>CVEs por Banner Grab (vulscan)</h4><ul class='compact'>{items}</ul>"
+
+    def banner_block(esc_f, banners):
+        if not banners:
+            return ""
+        items = "".join(
+            f"<li><strong>Puerto {b.get('port', '?')}</strong> ({b.get('protocol', '?')}): "
+            f"<code>{esc_f(b.get('product', 'desconocido'))}</code>"
+            + (f" v{esc_f(b.get('version', ''))}" if b.get('version') else "")
+            + (f" <span class='muted'>{esc_f(b.get('banner', '')[:120])}</span>" if b.get('banner') else "")
+            + (f" <span class='error'>{esc_f(b.get('error', ''))}</span>" if b.get('error') else "")
+            + "</li>"
+            for b in banners
+        )
+        return f"<h4>Banners de Servicio</h4><ul class='compact'>{items}</ul>"
+
+    def api_block(esc_f, api_eps):
+        if not api_eps:
+            return ""
+        total = len(api_eps)
+        non404 = [e for e in api_eps if e.get("status_code") and e["status_code"] != 404]
+        shadow = [e for e in api_eps if e.get("is_shadow")]
+        rows = "".join(
+            f"<tr><td>{e.get('method','?')}</td><td><code>{esc_f(e.get('path','?'))}</code></td>"
+            f"<td>{e.get('status_code','?')}</td><td>{esc_f(e.get('category','?'))}</td>"
+            f"<td>{'⚠ Shadow' if e.get('is_shadow') else ''}</td></tr>"
+            for e in non404[:25]
+        )
+        extra = ""
+        if len(non404) > 25:
+            extra = f"<p class='muted small'>… y {len(non404)-25} más de {total} endpoints probados</p>"
+        return (
+            f"<h4>API Endpoints Discovery</h4>"
+            f"<p class='meta'>{total} rutas probadas · {len(non404)} responden · {len(shadow)} shadow API</p>"
+            f"<table class='data'><thead><tr><th>Método</th><th>Ruta</th><th>Status</th><th>Categoría</th><th>Shadow</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table>{extra}"
+        )
+
+    def paths_block(esc_f, paths):
+        if not paths:
+            return ""
+        interesting = [x for x in paths if x.get("status_code") not in (None, 404)]
+        to_show = interesting if interesting else paths[:8]
+        items = "".join(
+            f"<tr><td><code>{esc_f(x.get('path',''))}</code></td>"
+            f"<td>{esc_f(str(x.get('status_code') if x.get('status_code') is not None else x.get('error') or '—'))}</td>"
+            f"<td>{esc_f(x.get('method','HEAD'))}</td></tr>"
+            for x in to_show
+        )
+        return f"<h4>Rutas Públicas (HEAD)</h4><table class='data'><thead><tr><th>Ruta</th><th>Status</th><th>Método</th></tr></thead><tbody>{items}</tbody></table>"
 
     def _cert_block(esc_f, tls):
         items = []
@@ -338,6 +387,34 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
             return ""
         return f"<h4>Cabeceras de Seguridad</h4><ul class='compact'>{''.join(items)}</ul>"
 
+    def _open_ports_block(esc_f, open_ports):
+        if not open_ports:
+            return ""
+        open_only = [o for o in open_ports if o.get("state") == "open"]
+        items = "".join(
+            f"<li>Puerto {o.get('port','?')}: {o.get('service', '?')}</li>"
+            for o in open_only
+        )
+        return f"<h4>Puertos Abiertos</h4><ul class='compact'>{items}</ul>"
+
+    def _brute_block(esc_f, brute_subs):
+        if not brute_subs:
+            return ""
+        items = "".join(
+            f"<li><code>{esc_f(b.get('fqdn','?'))}</code> — {esc_f(', '.join(b.get('ips') or []))}</li>"
+            for b in brute_subs
+        )
+        return f"<h4>Subdominios (Brute Force DNS)</h4><ul class='compact'>{items}</ul>"
+
+    def _pivot_block(esc_f, pivot_results):
+        if not pivot_results:
+            return ""
+        items = "".join(
+            f"<li><code>{esc_f(r.get('ip','?'))}</code>: PTR={esc_f(r.get('ptr','-'))}, crt.sh: {', '.join(r.get('fqdns_from_crt', [])[:5])}{'...' if len(r.get('fqdns_from_crt',[]))>5 else ''}</li>"
+            for r in pivot_results[:5]
+        )
+        return f"<h4>IP Pivot (FQDNs descubiertos)</h4><ul class='compact'>{items}</ul>"
+
     def _external_block(esc_f, p):
         ext = p.get("external") or {}
         parts = []
@@ -362,7 +439,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
             vulns = list({v for h in shodan["hosts"] for v in h.get("vulns", [])})
             items = []
             if ports: items.append(f"<li>Puertos: {esc_f(', '.join(str(p) for p in sorted(ports)[:20]))}</li>")
-            if vulns: items.append(f"<li>Vulnerabilidades: {esc_f(', '.join(vulns[:10]))}</li>")
+            if vulns: items.append(f"<li>Vulnerabilidades: {esc_f(', '.join(vulns))}</li>")
             for h in shodan["hosts"][:3]:
                 if h.get("org"): items.append(f"<li>Org: {esc_f(h['org'])} ({esc_f(h.get('country','?'))})</li>")
             if items:
@@ -385,13 +462,184 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
             if th.get("ips"): items.append(f"<li>IPs: {esc_f(', '.join(th['ips'][:5]))}</li>")
             if items:
                 parts.append(f"<h4>theHarvester</h4><ul class='compact'>{''.join(items)}</ul>")
+        kumo = p.get("kumo") or {}
+        if isinstance(kumo, dict):
+            k_parts = []
+            wb = kumo.get("wayback") or {}
+            if wb.get("interesting") and not wb.get("error"):
+                k_parts.append(f"<h4>Wayback Machine</h4><ul class='compact'>" + "".join(f"<li><code>{esc_f(u)}</code></li>" for u in wb["interesting"][:6]) + "</ul>")
+            bi = kumo.get("breachintel") or {}
+            if bi and not bi.get("error"):
+                s = bi.get("summary") or {}
+                bi_seg = []
+                if s.get("total_employees_leaked"): bi_seg.append(f"empleados: {s['total_employees_leaked']}")
+                if s.get("total_clients_leaked"): bi_seg.append(f"clientes: {s['total_clients_leaked']}")
+                if s.get("total_infostealer_hits"): bi_seg.append(f"<b>infostealer: {s['total_infostealer_hits']}</b>")
+                if bi_seg:
+                    k_parts.append(f"<h4>Breach Intel</h4><ul class='compact'><li>{' · '.join(bi_seg)}</li></ul>")
+            js = kumo.get("js_secrets") or {}
+            if js.get("secrets") and not js.get("error"):
+                js_items = "".join(f"<li><b>{esc_f(x.get('type',''))}</b> en <code>{esc_f(x.get('file',''))}</code> — {esc_f(str(x.get('value',''))[:50])}</li>" for x in js["secrets"][:8])
+                k_parts.append(f"<h4>JS Secrets</h4><ul class='compact'>{js_items}</ul>")
+            nu = kumo.get("nuclei") or {}
+            if nu.get("findings") and not nu.get("error"):
+                sc = nu.get("severity_counts") or {}
+                sc_seg = ' · '.join(f"{sc.get(sv,0)} {sv}" for sv in ("critical","high","medium","low","info") if sc.get(sv))
+                nu_items = "".join(f"<li>{esc_f(f.get('name','?'))}</li>" for f in nu["findings"][:10])
+                k_parts.append(f"<h4>Vuln Scanner KUMO</h4><p class='meta'>{esc_f(sc_seg)}</p><ul class='compact'>{nu_items}</ul>")
+            if k_parts:
+                parts.append("".join(k_parts))
+        prism = p.get("prism") or {}
+        if isinstance(prism, dict):
+            pr_parts = []
+            ll = prism.get("leak_lookup") or {}
+            if ll and not ll.get("error") and ll.get("breaches"):
+                ll_items = "".join(f"<li><span class='err'>{esc_f(b.get('name','?'))}</span></li>" for b in ll["breaches"][:12])
+                pr_parts.append(f"<h4>Prism Breach Lookup ({len(ll.get('breaches', []))})</h4><ul class='compact'>{ll_items}</ul>")
+            oc = prism.get("onion_checker") or {}
+            if oc and not oc.get("error") and oc.get("results"):
+                oc_items = "".join(f"<li><code>{esc_f(r.get('url','?'))}</code> ({esc_f(r.get('source','?'))})</li>" for r in oc["results"][:8])
+                pr_parts.append(f"<h4>Prism Onion / Dark Web</h4><ul class='compact'>{oc_items}</ul>")
+            gh = prism.get("github_recon") or {}
+            if gh and not gh.get("error") and gh.get("profile"):
+                prof = gh.get("profile") or {}
+                gh_seg = []
+                if prof.get("name"): gh_seg.append(f"@{gh.get('username','?')} ({esc_f(prof['name'])})")
+                if gh.get("repo_count"): gh_seg.append(f"{gh.get('repo_count')} repos · {gh.get('total_stars',0)} stars")
+                if gh.get("emails"): gh_seg.append("emails: " + esc_f(", ".join(gh["emails"][:4])))
+                pr_parts.append(f"<h4>Prism GitHub Recon</h4><ul class='compact'><li>{' · '.join(gh_seg)}</li></ul>")
+            gr = prism.get("gravatar") or {}
+            if gr and not gr.get("error") and gr.get("hits"):
+                gr_items = "".join(f"<li><b>{esc_f(h.get('display_name','?'))}</b> ({esc_f(h.get('email','?'))})</li>" for h in gr["hits"][:6])
+                pr_parts.append(f"<h4>Prism Gravatar</h4><ul class='compact'>{gr_items}</ul>")
+            wa = prism.get("website_analyzer") or {}
+            if wa and not wa.get("error"):
+                wa_items = []
+                if wa.get("technologies"): wa_items.append("<li><b>Tech:</b> " + esc_f(", ".join(wa["technologies"])) + "</li>")
+                if wa.get("social_links"): wa_items.append("<li><b>Redes:</b> " + " · ".join(f"{esc_f(s.get('platform','?'))}: @{esc_f(s.get('username','?'))}" for s in wa["social_links"][:6]) + "</li>")
+                if wa.get("emails"): wa_items.append("<li><b>Emails:</b> " + esc_f(", ".join(wa["emails"][:6])) + "</li>")
+                if wa.get("phones"): wa_items.append("<li><b>Tel:</b> " + esc_f(", ".join(wa["phones"][:4])) + "</li>")
+                if wa_items:
+                    pr_parts.append(f"<h4>Prism Website Analyzer</h4><ul class='compact'>{''.join(wa_items)}</ul>")
+            sv = prism.get("smtp_verify") or {}
+            if sv and not sv.get("error") and sv.get("per_email"):
+                sv_items = []
+                for r in sv["per_email"]:
+                    if not isinstance(r, dict): continue
+                    st = "existe" if r.get("exists") is True else ("no existe" if r.get("exists") is False else "indefinido")
+                    sv_items.append(f"<li><code>{esc_f(r.get('email','?'))}</code>: <b>{st}</b>" + (" · catch-all" if r.get("catch_all") else "") + "</li>")
+                pr_parts.append(f"<h4>Prism SMTP Verify</h4><ul class='compact'>{''.join(sv_items)}</ul>")
+            vt = prism.get("virustotal") or {}
+            if vt and not vt.get("error") and vt.get("status") == "ok":
+                verdict = "malicioso" if vt.get("malicious") else ("sospechoso" if vt.get("suspicious") else "limpio")
+                vt_seg = f"{esc_f(vt.get('query','?'))}: <b>{verdict}</b>"
+                if vt.get("malicious"): vt_seg += f" · {vt.get('malicious')} malicioso"
+                if vt.get("suspicious"): vt_seg += f" · {vt.get('suspicious')} sospechoso"
+                pr_parts.append(f"<h4>Prism VirusTotal</h4><ul class='compact'><li>{vt_seg}</li></ul>")
+            ab = prism.get("abuseipdb") or {}
+            if ab and not ab.get("error") and ab.get("status") == "ok":
+                ab_seg = f"score {ab.get('abuse_score')}/100 · {ab.get('total_reports',0)} reportes"
+                if ab.get("is_tor"): ab_seg += " · TOR"
+                pr_parts.append(f"<h4>Prism AbuseIPDB</h4><ul class='compact'><li>{esc_f(ab_seg)}</li></ul>")
+            if pr_parts:
+                parts.append("".join(pr_parts))
+        co = p.get("claude_osint") or {}
+        if isinstance(co, dict):
+            co_parts = []
+            m365 = co.get("m365_fingerprint") or {}
+            if m365 and not m365.get("error"):
+                m365_items = []
+                if m365.get("tenant_space"): m365_items.append(f"Namespace: <b>{esc_f(m365['tenant_space'])}</b>")
+                if m365.get("tenant_guid"): m365_items.append(f"Tenant GUID: <code>{esc_f(m365['tenant_guid'])}</code>")
+                if m365.get("oidc", {}).get("issuer"): m365_items.append(f"Issuer: <code>{esc_f(m365['oidc']['issuer'][:80])}</code>")
+                if m365.get("m365_detected"): m365_items.append("Microsoft 365 detectado")
+                if m365_items:
+                    co_parts.append(f"<h4>Claude-OSINT M365 Fingerprint</h4><ul class='compact'>" + "".join(f"<li>{x}</li>" for x in m365_items) + "</ul>")
+            spf = co.get("spf_supply_chain") or {}
+            if spf and not spf.get("error"):
+                v = spf.get("verdict") or {}
+                spf_items = [f"Verdict: <b>{esc_f(v.get('spoofable','?'))}</b> — {esc_f(v.get('vector',''))}"]
+                sc = spf.get("supply_chain") or {}
+                if sc:
+                    spf_items.append(f"Lookups: {sc.get('lookup_cost_mechanisms')} · voids: {sc.get('void_lookups')}")
+                    if sc.get("dead_includes"): spf_items.append(f"Dead: <code>{esc_f(', '.join(sc['dead_includes'][:5]))}</code>")
+                    if sc.get("perm_error"): spf_items.append("<span class='err'>PermError SPF fail-open</span>")
+                co_parts.append(f"<h4>Claude-OSINT SPF/DMARC Supply-chain</h4><ul class='compact'>" + "".join(f"<li>{x}</li>" for x in spf_items) + "</ul>")
+            org = co.get("org_attribution") or {}
+            if org and not org.get("error") and (org.get("lei") or org.get("crt_sh_org", {}).get("candidate_domains")):
+                org_items = []
+                if org.get("lei"): org_items.append(f"LEI: <code>{esc_f(org['lei'])}</code> — {esc_f(org.get('legal_name') or '')}")
+                if org.get("direct_children"): org_items.append(f"Hijos GLEIF: {esc_f(', '.join(c.get('name') or '?' for c in org['direct_children'][:5]))}")
+                if org.get("crt_sh_org", {}).get("candidate_domains"): org_items.append(f"crt.sh O=: <code>{esc_f(', '.join(org['crt_sh_org']['candidate_domains'][:6]))}</code>")
+                co_parts.append(f"<h4>Claude-OSINT Org Attribution</h4><ul class='compact'>" + "".join(f"<li>{x}</li>" for x in org_items) + "</ul>")
+            cti = co.get("cti_chatter") or {}
+            if cti and not cti.get("error"):
+                cti_items = []
+                rw = cti.get("ransomwatch") or {}
+                if rw.get("hits"): cti_items.append(f"Ransomwatch: <b>{rw.get('total',0)}</b> (" + esc_f("; ".join(h.get('title','?')[:60] for h in rw['hits'][:3])) + ")")
+                rl = cti.get("ransomware_live") or {}
+                if rl.get("hits"): cti_items.append(f"Ransomware.live: <b>{rl.get('total',0)}</b>")
+                if cti_items:
+                    co_parts.append(f"<h4>Claude-OSINT CTI Chatter</h4><ul class='compact'>" + "".join(f"<li>{x}</li>" for x in cti_items) + "</ul>")
+            pdn = co.get("passive_dns_extra") or {}
+            if pdn and not pdn.get("error") and pdn.get("subdomains"):
+                pdn_items = "".join(f"<li><code>{esc_f(s)}</code></li>" for s in pdn["subdomains"][:10])
+                co_parts.append(f"<h4>Claude-OSINT Passive DNS ({len(pdn.get('subdomains', []))})</h4><ul class='compact'>{pdn_items}</ul>")
+            cn = co.get("cloud_native_fp") or {}
+            if cn and not cn.get("error") and cn.get("fingerprints"):
+                cn_items = "".join(f"<li><b>{esc_f(f.get('service','?'))}</b> — <code>{esc_f(f.get('cname','?'))}</code></li>" for f in cn["fingerprints"][:6])
+                co_parts.append(f"<h4>Claude-OSINT Cloud-native fingerprint</h4><ul class='compact'>{cn_items}</ul>")
+            sop = co.get("saml_oidc_probe") or {}
+            if sop and not sop.get("error"):
+                sop_items = []
+                for key, label in (("openid_config", "OIDC"), ("saml_metadata", "SAML"), ("adfs_mex", "ADFS")):
+                    ch = sop.get(key) or {}
+                    if ch.get("reachable"):
+                        sop_items.append(f"<li>{label}: {ch.get('status','?')}" + (" metadata" if ch.get("is_metadata") else "") + "</li>")
+                if sop_items:
+                    co_parts.append(f"<h4>Claude-OSINT SSO/OIDC probe</h4><ul class='compact'>{''.join(sop_items)}</ul>")
+            ss = co.get("secret_scan") or {}
+            if ss and not ss.get("error") and ss.get("critical"):
+                ss_items = "".join(f"<li><span class='err'>{esc_f(g.get('pattern','?'))}</span> x{g.get('count')} — <code>{esc_f(str(g.get('first',''))[:60])}</code></li>" for g in ss["critical"][:4])
+                co_parts.append(f"<h4>Claude-OSINT Secret Scan</h4><ul class='compact'>{ss_items}</ul>")
+            if co_parts:
+                parts.append("".join(co_parts))
+        canon = [it for it in collect_pasive_items(p) if it.get("status") == "ok"]
+        if canon:
+            by_group: dict[str, list] = {}
+            for it in canon:
+                by_group.setdefault(it.get("grupo") or "Otros", []).append(it)
+            for grupo in sorted(by_group):
+                listed = "".join(f"<li><strong>{esc_f(it['label'])}:</strong> {esc_f(it['valor'])}</li>" for it in by_group[grupo])
+                parts.append(f"<h4>Pasivo · {esc_f(grupo)}</h4><ul class='compact'>{listed}</ul>")
+        semi = [it for it in collect_semi_active_items(p) if it.get("status") == "ok"]
+        if semi:
+            by_group = {}
+            for it in semi:
+                by_group.setdefault(it.get("grupo") or "Otros", []).append(it)
+            for grupo in sorted(by_group):
+                listed = "".join(f"<li><strong>{esc_f(it['label'])}:</strong> {esc_f(it['valor'])}</li>" for it in by_group[grupo])
+                parts.append(f"<h4>Semi-activo · {esc_f(grupo)}</h4><ul class='compact'>{listed}</ul>")
+        strix = p.get("strix") or {}
+        if strix and strix.get("status") == "ok":
+            findings = strix.get("findings") or []
+            meta = f"Modo {esc_f(strix.get('mode','?'))} · {len(findings)} hallazgo(s)"
+            parts.append(f"<h4>Strix AI Pentest</h4><p class='meta'>{meta}</p>")
+            if findings:
+                items = "".join(
+                    f"<li><span class='risk-{esc_f(f.get('severity','low'))}'>[{esc_f(f.get('severity','?'))}]</span> "
+                    f"<strong>{esc_f(f.get('title','?'))}</strong> · {esc_f(f.get('cve','-'))} · CVSS {esc_f(f.get('cvss','-'))}<br/>"
+                    f"<span class='muted'>{esc_f(str(f.get('remediation_steps',''))[:160])}</span></li>"
+                    for f in sorted(findings, key=lambda x: str(x.get('severity','low')).lower() in ("critical","high"), reverse=True)[:8]
+                )
+                parts.append(f"<ul class='compact'>{items}</ul>")
         return "\n".join(parts)
 
     def takeover_block(esc_f, risks):
         if not risks:
             return ""
         items = ""
-        for r in risks[:10]:
+        for r in risks:
             vulnerable = r.get("vulnerable", False)
             badge = '<span class="err">' + chr(10007) + ' VULNERABLE</span>' if vulnerable else '<span class="warn">&#9888; POTENCIAL</span>'
             items += f'<li><code>{esc_f(r.get("host", ""))}</code> &rarr; <code>{esc_f(r.get("cname", ""))}</code> {badge}: {esc_f(r.get("description", ""))}</li>'
@@ -405,12 +653,12 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
         ok_mark = chr(10003)
         err_mark = chr(10007)
         items = ""
-        for f in findings[:10]:
+        for f in findings:
             icon = err_mark if f.get("severity") == "high" else ("&#9888;" if f.get("severity") == "medium" else "&#9679;")
             items += f"<li>{icon} [{f.get('severity','').upper()}] <strong>{esc_f(f.get('directive',''))}</strong>: {esc_f(f.get('description',''))}</li>"
         if len(findings) > 10:
             items += f'<li class="muted">... y {len(findings) - 10} mas</li>'
-        return f"<h4>Analisis de CSP</h4><ul class='compact'>{items}</ul>"
+        return f"<h4>Análisis de CSP</h4><ul class='compact'>{items}</ul>"
 
     def cookie_block(esc_f, findings):
         if not findings:
@@ -418,7 +666,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
         ok_mark = chr(10003)
         err_mark = chr(10007)
         items = ""
-        for f in findings[:10]:
+        for f in findings:
             icon = err_mark if f.get("severity") == "high" else ("&#9888;" if f.get("severity") == "medium" else "&#9679;")
             items += f"<li>{icon} [{f.get('severity','').upper()}] {esc_f(f.get('description',''))}</li>"
         if len(findings) > 10:
@@ -430,18 +678,47 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
         dnsbl = scr.get("dnsbl") or []
         urlhaus = scr.get("urlhaus") or []
         items = ""
-        for d in dnsbl[:5]:
+        for d in dnsbl:
             items += f"<li><span class='err'>{chr(10007)} DNSBL: IP {esc_f(d.get('ip',''))} listada en {esc_f(d.get('dnsbl',''))}</span></li>"
-        for u in urlhaus[:5]:
+        for u in urlhaus:
             items += f"<li><span class='err'>{chr(10007)} URLhaus: {esc_f(u.get('domain',''))} ({u.get('url_count',0)} urls maliciosas)</span></li>"
         if items:
-            return f"<h4>Reputacion de terceros (Supply Chain)</h4><ul class='compact'>{items}</ul>"
+            return f"<h4>Reputación de terceros (Supply Chain)</h4><ul class='compact'>{items}</ul>"
         return ""
+
+    def finalrecon_block(esc_f, p):
+        fr = p.get("finalrecon") or {}
+        if not fr:
+            return ""
+        items = ""
+        fr_js = fr.get("javascripts") or []
+        fr_wb = fr.get("wayback") or {}
+        fr_wb_js = fr_wb.get("js_files") or []
+        fr_wb_api = fr_wb.get("api_endpoints") or []
+        fr_wb_params = fr_wb.get("juicy_params") or []
+        fr_sitemap = fr.get("sitemap") or []
+        fr_ext = fr.get("external_urls") or []
+        all_js = list(dict.fromkeys(fr_js + fr_wb_js))
+        if all_js:
+            items += f"<li>Archivos JS expuestos: {len(all_js)}</li>"
+        if fr_ext:
+            items += f"<li>Enlaces externos: {len(fr_ext)}</li>"
+        if fr_sitemap:
+            items += f"<li>Sitemap: {len(fr_sitemap)} URLs</li>"
+        if fr_wb_js:
+            items += f"<li>JS históricos Wayback: {len(fr_wb_js)}</li>"
+        if fr_wb_api:
+            items += f"<li>Endpoints API Wayback: {len(fr_wb_api)}</li>"
+        if fr_wb_params:
+            items += f"<li>Parametros sensibles Wayback: {len(fr_wb_params)}</li>"
+        if not items:
+            return ""
+        return f"<h4>Web Recon - FinalRecon</h4><ul class='compact'>{items}</ul>"
 
     def owasp_block(esc_f, m):
         ow = m.get("owasp") or {}
         if not ow:
-            return '<h4>OWASP Agentic Top 10</h4><ul class="compact"><li class="muted">Sin evaluacion disponible.</li></ul>'
+            return '<h4>OWASP Agentic Top 10</h4><ul class="compact"><li class="muted">Sin evaluación disponible.</li></ul>'
         grade = ow.get("overall_grade", "—")
         pct = ow.get("overall_compliance", 0)
         items = ""
@@ -486,26 +763,54 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
         subs = p.get("subdomains") or []
         crt_subs = p.get("crt_subdomains") or []
         san_list = p.get("san_list") or []
-        sub_li = "".join(f"<li><code>{esc(s.get('host'))}</code> {esc(', '.join(s.get('ipv4') or []))}</li>" for s in subs[:25])
-        crt_li = "".join(f"<li><code>{esc(s)}</code></li>" for s in crt_subs[:30])
-        san_li = "".join(f"<li><code>{esc(s)}</code></li>" for s in san_list[:20])
-        dnssec_items = []
+        sub_li = "".join(f"<li><code>{esc(s.get('host'))}</code> {esc(', '.join(s.get('ipv4') or []))}</li>" for s in subs)
+        crt_li = "".join(f"<li><code>{esc(s)}</code></li>" for s in crt_subs)
+        san_li = "".join(f"<li><code>{esc(s)}</code></li>" for s in san_list)
+        dns_items = []
+        dns_data = p.get("dns") or {}
+        mx = dns_data.get("mx_records") or []
+        for m in mx:
+            dns_items.append(f"MX: {esc(m.get('preference', '?'))} {esc(m.get('exchange', ''))}")
+        ns = dns_data.get("ns_records") or []
+        for n in ns:
+            dns_items.append(f"NS: {esc(n.get('nameserver', '') or n.get('target', ''))}")
+        spf = dns_data.get("spf_record")
+        if spf:
+            dns_items.append(f"SPF: {esc(spf[:180])}")
+        dmarc_rec = dns_data.get("dmarc_record")
+        if dmarc_rec:
+            dns_items.append(f"DMARC: {esc(dmarc_rec[:180])}")
+        dkim = dns_data.get("dkim_records") or []
+        for dk in dkim:
+            dns_items.append(f"DKIM/{esc(dk.get('selector', '?'))}: {esc(dk.get('record', '')[:100])}")
+        dane = dns_data.get("dane_records") or []
+        for dn in dane:
+            dns_items.append(f"DANE: _{esc(dn.get('port','?'))}._{esc(dn.get('protocol','?'))} usage={esc(dn.get('usage','?'))}")
+        if dns_data.get("dnssec_ok"):
+            dns_items.append("DNSSEC: activo")
+        ipv6 = dns_data.get("ipv6") or []
+        if ipv6:
+            dns_items.append(f"AAAA IPv6: {', '.join(esc(x) for x in ipv6)}")
         caa = p.get("caa_records") or []
         for rec in caa:
-            dnssec_items.append(f"CAA: {esc(rec.get('tag', '?'))} {esc(rec.get('value', '?'))}")
+            dns_items.append(f"CAA: {esc(rec.get('tag', '?'))} {esc(rec.get('value', '?'))}")
         if p.get("mta_sts"):
-            dnssec_items.append(f"MTA-STS: {esc(p['mta_sts'][:120])}")
+            dns_items.append(f"MTA-STS: {esc(p['mta_sts'][:120])}")
         if p.get("tls_rpt"):
-            dnssec_items.append(f"TLS-RPT: {esc(p['tls_rpt'][:120])}")
+            dns_items.append(f"TLS-RPT: {esc(p['tls_rpt'][:120])}")
         if p.get("bimi"):
-            dnssec_items.append(f"BIMI: {esc(p['bimi'][:120])}")
+            dns_items.append(f"BIMI: {esc(p['bimi'][:120])}")
+        ip_rep = dns_data.get("ip_reputation") or []
+        if ip_rep:
+            ipr = ", ".join(f"{r.get('ip','?')} en {r.get('dnsbl','?')}" for r in ip_rep[:5])
+            dns_items.append(f"DNSBL: {esc(ipr)}")
 
         score = domain_score(p)
         cl_443 = "abierto" if (p.get("port_443") or {}).get("open") else "cerrado"
         cl_80 = "abierto" if (p.get("port_80") or {}).get("open") else "cerrado"
         crt_hdr = '<h4>Subdominios (crt.sh)</h4><ul class="compact">'
         san_hdr = '<h4>SAN</h4><ul class="compact">'
-        dnssec_hdr = '<h4>Registros DNS pasivos</h4><ul class="compact"><li>'
+        dns_hdr = '<h4>Registros DNS</h4><ul class="compact"><li>'
         if score >= 90:
             score_cls = "score-a"
         elif score >= 75:
@@ -520,7 +825,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
             score_cls = "score-f"
 
         prov_sections.append(
-            (lambda sc, cl, sl, di, sub_li, crt_li, san_li, dnssec_items: f"""
+            (lambda sc, cl, sl, di, sub_li, crt_li, san_li, dns_items: f"""
 <section class="card">
   <div class="card-header">
     <div>
@@ -542,21 +847,29 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
   <ul class="compact">{sub_li or '<li class="muted">Ninguno con el diccionario actual</li>'}</ul>
   {crt_hdr + crt_li + "</ul>" if crt_subs else ""}
   {san_hdr + san_li + "</ul>" if san_list else ""}
-  {dnssec_hdr + "</li><li>".join(dnssec_items) + "</li></ul>" if dnssec_items else ""}
+  {dns_hdr + "</li><li>".join(dns_items) + "</li></ul>" if dns_items else ""}
   {_cert_block(esc, tls)}
   {_redirect_block(esc, h)}
   {_fingerprint_block(esc, h)}
   {_sec_headers_block(esc, hdr)}
+  {_open_ports_block(esc, p.get("open_ports") or [])}
+  {_brute_block(esc, p.get("brute_subs") or [])}
+  {_pivot_block(esc, p.get("pivot_results") or [])}
   {vuln_block(esc, p.get("vulnerabilities") or [])}
   {takeover_block(esc, p.get("takeover_risks") or [])}
   {csp_block(esc, p.get("csp_findings") or [])}
   {cookie_block(esc, p.get("cookie_findings") or [])}
-  {scr_block(esc, p)}
-  {social_block(esc, p)}
+        {scr_block(esc, p)}
+        {finalrecon_block(esc, p)}
+        {social_block(esc, p)}
   {owasp_block(esc, matrix_by_domain.get(dom, {}))}
   {typo_block(esc, p.get("typosquatting") or [])}
   {patch_block(esc, p.get("patching") or [])}
   {supply_block(esc, p.get("supply_chain") or [])}
+  {cve_block(esc, p.get("cve_findings") or [])}
+  {banner_block(esc, p.get("banner_grabs") or [])}
+  {api_block(esc, p.get("api_endpoints") or [])}
+  {paths_block(esc, p.get("public_paths") or [])}
   {_external_block(esc, p)}
   <details>
     <summary class="muted small">Ver cabeceras HTTP</summary>
@@ -567,7 +880,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
     "abierto" if (p.get("port_443") or {}).get("open") else "cerrado",
     "abierto" if (p.get("port_80") or {}).get("open") else "cerrado",
     dom,
-    sub_li, crt_li, san_li, dnssec_items)
+    sub_li, crt_li, san_li, dns_items)
         )
 
     matrix_html = ""
@@ -606,6 +919,7 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
   <td class="c">{ok_mark if m.get("supply_reputation_clean") else err_mark}</td>
   </tr>"""
 
+    toc_block = render_toc(report_type="b3")
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -695,6 +1009,12 @@ pre.small {{ background:#f8fafc; padding:8px; border-radius:6px; overflow:auto; 
 ul.compact {{ margin:4px 0; padding-left:1.1rem; font-size:12.5px; }}
 ul.compact li {{ margin:2px 0; }}
 .footnote {{ font-size:11px; color:var(--muted); margin-top:32px; padding-top:12px; border-top:1px solid var(--border); }}
+.risk-critical {{ display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; background:#5c1010; color:#fff; }}
+.risk-high {{ display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; background:#9b1c1c; color:#fff; }}
+.risk-med {{ display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; background:#cc8800; color:#fff; }}
+.risk-low {{ display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; background:#2d7a4a; color:#fff; }}
+.epss-badge {{ display:inline-block; font-size:10px; padding:1px 5px; border-radius:4px; background:#e8eef5; color:#3a5478; }}
+.kev-badge {{ display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; background:#fce4e4; color:#a00; }}
 details summary {{ cursor:pointer; }}
 details summary:focus {{ outline:none; }}
 .cve-badge {{ display:inline-block; background:#e9ecef; padding:0 6px; border-radius:3px; font-family:monospace; font-size:11px; }}
@@ -725,9 +1045,11 @@ details summary:focus {{ outline:none; }}
       </div>
     </div>
 
-    <h2 class="sec">Resumen de evaluacion</h2>
+    {toc_block}
+
+  <h2 class="sec">Resumen de evaluación</h2>
     <div class="card">
-      <p>Postura observada por <strong>Attack Surface Management (ASM)</strong> sobre <strong>{n} dominio(s)</strong> de proveedores. Las puntuaciones son indicativas, calculadas a partir de cabeceras HTTP, TLS, DNS (SPF/DMARC), reputacion, vulnerabilidades, typosquatting, patching cadence y dependencias de terceros.</p>
+      <p>Postura observada por <strong>Attack Surface Management (ASM)</strong> sobre <strong>{n} dominio(s)</strong> de proveedores. Las puntuaciones son indicativas, calculadas a partir de cabeceras HTTP, TLS, DNS (SPF/DMARC), reputación, vulnerabilidades, typosquatting, patching cadence y dependencias de terceros.</p>
       <div class="kpi-row">
         <span><strong>Activos:</strong> {n}</span>
         <span><strong>Subdominios (DNS):</strong> {total_subs}</span>
@@ -740,11 +1062,17 @@ details summary:focus {{ outline:none; }}
       </div>
     </div>
 
+    {resumen_block}
+
+  {score_legend_block}
+
     <h2 class="sec">Hallazgos</h2>
     <div class="card">
       <table class="data">
         <thead><tr><th>Categoria</th><th>Descripcion</th><th>Proveedores</th><th>Severidad</th></tr></thead>
-        <tbody>{risk_table_rows()}</tbody>
+        <tbody>{precia_blocks}
+
+  {risk_table_rows()}</tbody>
       </table>
     </div>
 
@@ -754,21 +1082,21 @@ details summary:focus {{ outline:none; }}
       <table class="data">
         <thead><tr><th>Factor</th><th>Fuente</th><th>Detalle</th></tr></thead>
         <tbody>
-          <tr><td>Configuraciones DNS</td><td>SPF/DMARC, DKIM, DNSSEC, DANE, MX, NS, CAA, MTA-STS, TLS-RPT, BIMI, STARTTLS</td><td>Verifica presencia y correcta configuracion de registros DNS de seguridad y STARTTLS en MX</td></tr>
-          <tr><td>SSL/TLS</td><td>Version negociada, vigencia, SAN</td><td>Evalua la fortaleza de la configuracion TLS del servidor web</td></tr>
+          <tr><td>Configuraciones DNS</td><td>SPF/DMARC, DKIM, DNSSEC, DANE, MX, NS, CAA, MTA-STS, TLS-RPT, BIMI, STARTTLS</td><td>Verifica presencia y correcta configuración de registros DNS de seguridad y STARTTLS en MX</td></tr>
+          <tr><td>SSL/TLS</td><td>Version negociada, vigencia, SAN</td><td>Evalua la fortaleza de la configuración TLS del servidor web</td></tr>
           <tr><td>Cabeceras HTTP de seguridad</td><td>HSTS, CSP, X-Frame-Options, X-Content-Type-Options</td><td>Detecta cabeceras de seguridad faltantes o mal configuradas</td></tr>
-          <tr><td>Analisis de CSP</td><td>Directivas CSP (base-uri, object-src, frame-ancestors, form-action, unsafe-inline/unsafe-eval, comodines, bypass JSONP, report-uri)</td><td>Deteccion de debilidades en la politica de seguridad de contenido</td></tr>
+          <tr><td>Análisis de CSP</td><td>Directivas CSP (base-uri, object-src, frame-ancestors, form-action, unsafe-inline/unsafe-eval, comodines, bypass JSONP, report-uri)</td><td>Detección de debilidades en la política de seguridad de contenido</td></tr>
           <tr><td>Seguridad de Cookies</td><td>Flags Secure, HttpOnly, SameSite</td><td>Verificacion de flags de seguridad en cookies HTTP</td></tr>
           <tr><td>Superficie de subdominios</td><td>DNS prefijos + crt.sh + BufferOver + ThreatCrowd</td><td>Descubrimiento pasivo de subdominios y activos expuestos</td></tr>
-          <tr><td>Reputacion de IPs</td><td>DNSBL (Spamhaus, Barracuda, SpamCop, SORBS, CBL)</td><td>Verifica si las IPs del dominio estan listadas como maliciosas</td></tr>
+          <tr><td>Reputación de IPs</td><td>DNSBL (Spamhaus, Barracuda, SpamCop, SORBS, CBL)</td><td>Verifica si las IPs del dominio estan listadas como maliciosas</td></tr>
           <tr><td>Malware</td><td>URLhaus (Abuse.ch)</td><td>Consulta si el dominio ha sido reportado como distribuidor de malware</td></tr>
-          <tr><td>Vulnerabilidades</td><td>OSV.dev</td><td>Deteccion de CVEs asociados a tecnologias y versiones detectadas</td></tr>
+          <tr><td>Vulnerabilidades</td><td>OSV.dev</td><td>Detección de CVEs asociados a tecnologias y versiones detectadas</td></tr>
           <tr><td>Fugas de credenciales</td><td>leak-lookup.com</td><td>Identifica si el dominio aparece en breaches conocidos (requiere LEAK_API_KEY)</td></tr>
           <tr><td>Typosquatting</td><td>Variantes DNS (TLD, caracteres, omisiones)</td><td>Genera variantes del dominio y verifica si estan activas</td></tr>
           <tr><td>Patching cadence</td><td>endoflife.date</td><td>Determina si las tecnologias detectadas estan EOL o proximas a EOL</td></tr>
           <tr><td>Subdomain Takeover</td><td>CNAME + fingerprints (S3, CloudFront, Heroku, Azure, GitHub Pages, etc.)</td><td>Detecta CNAMEs a servicios externos no configurados o colgantes</td></tr>
           <tr><td>Supply Chain</td><td>CSP headers + HTML scripts</td><td>Extrae dominios de terceros desde CSP y scripts, verifica resolucion DNS</td></tr>
-          <tr><td>Reputacion de terceros (Supply Chain)</td><td>DNSBL + URLhaus sobre IPs y dominios de terceros</td><td>Verifica si las IPs y dominios de la cadena de suministro tienen reputacion negativa</td></tr>
+          <tr><td>Reputación de terceros (Supply Chain)</td><td>DNSBL + URLhaus sobre IPs y dominios de terceros</td><td>Verifica si las IPs y dominios de la cadena de suministro tienen reputación negativa</td></tr>
         </tbody>
       </table>
     </div>
@@ -784,6 +1112,19 @@ details summary:focus {{ outline:none; }}
     <h2 class="sec">Superficie de ataque por proveedor</h2>
     {"".join(prov_sections)}
 
+    <h2 class="sec">CVEs frecuentes en ransomware (referencia)</h2>
+    <div class="card">
+      <p class="muted">En el informe PDF de referencia se listan CVEs con chequeo "Passed". Aquí no hay escaneo activo de CVE por host; use herramientas autorizadas (p. ej. nuclei con plantillas oficiales) si necesita esta capa.</p>
+      <table class="data">
+        <thead><tr><th>CVE</th><th>CVSSv3 (ref.)</th><th>Estado en este informe</th></tr></thead>
+        <tbody>
+          <tr><td>CVE-2021-44228</td><td>10.0</td><td class="muted">No evaluado (sin escaneo)</td></tr>
+          <tr><td>CVE-2018-13379</td><td>9.8</td><td class="muted">No evaluado (sin escaneo)</td></tr>
+          <tr><td>CVE-2020-5902</td><td>9.8</td><td class="muted">No evaluado (sin escaneo)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="footnote">
       <p><strong>Grupo Cibest</strong> &middot; Informe generado el {esc(now)} &middot; Version {esc(version)} &middot; Los datos presentados reflejan el estado en el momento del escaneo y pueden variar.</p>
     </div>
@@ -798,7 +1139,7 @@ def main() -> int:
     ap.add_argument("--asm", type=Path, default=ROOT / "asm_report.json")
     ap.add_argument("--out", type=Path, default=ROOT / "informe_grupocibest.html")
     ap.add_argument("--title", default="Third-Party Risk Assessment Report")
-    ap.add_argument("--subtitle", default="Evaluacion ASM del sitio publico Incocredito (host www)")
+    ap.add_argument("--subtitle", default="Evaluacion ASM del sitio publico Informe (host www)")
     ap.add_argument("--version", default="1.0")
     args = ap.parse_args()
     asm = json.loads(args.asm.read_text(encoding="utf-8"))

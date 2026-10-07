@@ -276,6 +276,92 @@ def run_theharvester(domain: str) -> dict:
     return result
 
 
+def run_greynoise(domain: str) -> dict:
+    """GreyNoise IP context: clasifica IPs del dominio como benign/malicious/unknown.
+    Sin API key usa community (rate-limited); con key usa v2 context.
+    """
+    api_key = _get_key("GREYNOISE_API_KEY")
+    ips = _resolve_ips(domain)[:5]
+    results: dict[str, Any] = {"domain": domain, "ips": {}}
+    if not ips:
+        return {"error": "Sin IPs resueltas", "skipped": True}
+    # Sin key y sin community disponible -> skipped
+    # Intentamos community primero si no hay key
+    for ip in ips:
+        entry: dict[str, Any] = {"ip": ip, "classification": "unknown"}
+        try:
+            if api_key:
+                r = requests.get(f"https://api.greynoise.io/v2/noise/context/{ip}",
+                                 headers={"key": api_key, "User-Agent": USER_AGENT}, timeout=12)
+            else:
+                r = requests.get(f"https://api.greynoise.io/v3/community/{ip}",
+                                 headers={"User-Agent": USER_AGENT}, timeout=12)
+            if r.status_code == 200:
+                data = r.json()
+                entry.update({
+                    "classification": data.get("classification") or data.get("message") or "unknown",
+                    "name": data.get("name"),
+                    "noise": data.get("noise"),
+                    "riot": data.get("riot"),
+                    "last_seen": data.get("last_seen"),
+                })
+                entry["enriched"] = True
+            elif r.status_code == 404:
+                entry["enriched"] = False
+            elif r.status_code == 401:
+                return {"error": "GREYNOISE_API_KEY inválida o sin permisos", "skipped": True}
+            elif r.status_code == 429:
+                return {"error": "GreyNoise rate-limited", "skipped": True}
+            else:
+                entry["error"] = f"HTTP {r.status_code}"
+            results["ips"][ip] = entry
+        except Exception as e:
+            results["ips"][ip] = {"ip": ip, "error": str(e)[:150]}
+    # Si no hay key y community falla por 429, marcamos skipped
+    if not api_key and not any(v.get("enriched") for v in results["ips"].values()):
+        # Sin key, si no hay datos no es error crítico
+        results["skipped"] = True
+    return results
+
+
+def run_securitytrails(domain: str) -> dict:
+    """SecurityTrails: histórico DNS y subdominios. Requiere SECURITYTRAILS_API_KEY."""
+    api_key = _get_key("SECURITYTRAILS_API_KEY")
+    if not api_key:
+        return {"error": "SECURITYTRAILS_API_KEY no configurada", "skipped": True}
+    try:
+        headers = {"APIKEY": api_key, "User-Agent": USER_AGENT}
+        result: dict[str, Any] = {"domain": domain}
+        # Subdominios
+        try:
+            r = requests.get(f"https://api.securitytrails.com/v1/domain/{domain}/subdomains",
+                             headers=headers, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                result["subdomains"] = data.get("subdomains", [])[:30]
+                result["subdomain_count"] = data.get("subdomain_count", len(result["subdomains"]))
+            else:
+                result["subdomains_error"] = f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            result["subdomains_error"] = str(e)[:150]
+        # WHOIS history
+        try:
+            r2 = requests.get(f"https://api.securitytrails.com/v1/history/{domain}/whois",
+                              headers=headers, timeout=15)
+            if r2.status_code == 200:
+                data2 = r2.json()
+                result["whois_history"] = (data2.get("result", {}).get("items", []) or [])[:2]
+            else:
+                result["whois_history_error"] = f"HTTP {r2.status_code}"
+        except Exception as e:
+            result["whois_history_error"] = str(e)[:150]
+        if not result.get("subdomains") and not result.get("whois_history"):
+            return {"error": "Sin datos de SecurityTrails", "skipped": True}
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def run_all(domain: str) -> dict:
     return {
         "whois": run_whois(domain),
@@ -283,5 +369,85 @@ def run_all(domain: str) -> dict:
         "shodan": run_shodan(domain),
         "censys": run_censys(domain),
         "theharvester": run_theharvester(domain),
+        "internetdb": run_internetdb(domain),
+        "shodan_exposure": run_shodan_exposure(domain),
+        "greynoise": run_greynoise(domain),
+        "securitytrails": run_securitytrails(domain),
         "scanned_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+    }
+
+
+INTERNETDB_URL = "https://internetdb.shodan.io/{ip}"
+INTERNETDB_TIMEOUT = 12
+
+
+def _resolve_ips(domain: str) -> list[str]:
+    """Resuelve A/AAAA del apex y de subdominios típicos, deduplicado."""
+    import dns.resolver
+    ips: list[str] = []
+    for host in [domain] + [f"{s}.{domain}" for s in ("www", "mail", "api", "admin", "ftp", "portal", "app", "cdn")]:
+        try:
+            for r in dns.resolver.resolve(host, "A", lifetime=6):
+                ip = str(r)
+                if ip not in ips:
+                    ips.append(ip)
+        except Exception:
+            continue
+    return ips[:10]
+
+
+def run_internetdb(domain: str) -> dict:
+    """Shodan InternetDB: datos públicos de una IP sin API key (JSON).
+
+    Devuelve, por IP: puertos, CVE, CPEs, hostnames y tags. 404 = IP sin
+    datos en InternetDB. Es la fuente Shodan más ligera y sin credenciales.
+    """
+    result: dict[str, Any] = {"domain": domain, "ips": {}}
+    ips = _resolve_ips(domain)
+    for ip in ips:
+        entry: dict[str, Any] = {"ip": ip, "ports": [], "vulns": [], "cpes": [], "hostnames": [], "tags": []}
+        try:
+            r = requests.get(f"{INTERNETDB_URL.rstrip('/')}/{ip}", timeout=INTERNETDB_TIMEOUT, headers={"User-Agent": USER_AGENT})
+            if r.status_code == 200:
+                data = r.json()
+                entry.update(
+                    ports=data.get("ports", []),
+                    vulns=data.get("vulns", []),
+                    cpes=data.get("cpes", []),
+                    hostnames=data.get("hostnames", []),
+                    tags=data.get("tags", []),
+                )
+                entry["enriched"] = True
+            elif r.status_code == 404:
+                entry["enriched"] = False
+            else:
+                entry["error"] = f"HTTP {r.status_code}"
+        except requests.exceptions.RequestException as e:
+            entry["error"] = str(e)[:150]
+        result["ips"][ip] = entry
+    return result
+
+
+def run_shodan_exposure(domain: str) -> dict:
+    """Heurística ligera de exposición basada en InternetDB: resume CVEs y
+    puertos expuestos por IP. El dashboard web exposure.shodan.io no ofrece
+    API pública estable, así que usamos los datos de InternetDB agregados.
+    """
+    entries = run_internetdb(domain).get("ips", {})
+    ports: list[int] = []
+    cve_set: set[str] = set()
+    for entry in entries.values():
+        for p in entry.get("ports", []):
+            if p not in ports:
+                ports.append(p)
+        for v in entry.get("vulns", []):
+            cve_set.add(v)
+    ports.sort()
+    return {
+        "domain": domain,
+        "ip_count": len(entries),
+        "puertos_expuestos": ports,
+        "total_cves": len(cve_set),
+        "cve_list": sorted(cve_set)[:15],
+        "critico": bool(cve_set),
     }

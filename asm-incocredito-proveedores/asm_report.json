@@ -1,0 +1,267 @@
+{
+  "generated_utc": "2026-05-20 06:19:21",
+  "providers": [
+    {
+      "id": "incocredito-www",
+      "name": "Incocrédito (www)",
+      "domain": "www.incocredito.com.co",
+      "dns": {
+        "ipv4": [
+          "190.145.61.251"
+        ],
+        "ipv6": [],
+        "spf_record": null,
+        "dmarc_record": null,
+        "dmarc_policy": null,
+        "mx_records": [],
+        "ns_records": [],
+        "errors": [
+          "TXT/SPF: The DNS response does not contain an answer to the question: www.incocredito.com.co. IN TXT",
+          "TXT/DMARC: The DNS query name does not exist: _dmarc.www.incocredito.com.co.",
+          "MX: The DNS response does not contain an answer to the question: www.incocredito.com.co. IN MX",
+          "NS: The DNS response does not contain an answer to the question: www.incocredito.com.co. IN NS"
+        ],
+        "ip_country": null,
+        "dnssec_ok": false,
+        "dkim_records": [],
+        "dane_records": [],
+        "ip_reputation": [
+          {
+            "ip": "190.145.61.251",
+            "dnsbl": "zen.spamhaus.org"
+          },
+          {
+            "ip": "190.145.61.251",
+            "dnsbl": "cbl.abuseat.org"
+          }
+        ]
+      },
+      "port_80": {
+        "open": false,
+        "error": "timed out"
+      },
+      "port_443": {
+        "open": true,
+        "error": null
+      },
+      "tls": {
+        "tls13_only_ok": false,
+        "negotiated_version": "TLSv1.3",
+        "cert_subject": "commonName=*.incocredito.com.co",
+        "cert_issuer": "countryName=US, stateOrProvinceName=Arizona, localityName=Scottsdale, organizationName=GoDaddy.com, Inc., organizationalUnitName=http://certs.godaddy.com/repository/, commonName=Go Daddy Secure Certificate Authority - G2",
+        "cert_expiry": "Nov  2 11:51:52 2026 GMT",
+        "cert_serial": "D49024C9A9D0815B",
+        "cert_version": "3",
+        "san_list": [
+          "*.incocredito.com.co",
+          "incocredito.com.co"
+        ],
+        "error": null
+      },
+      "https": {
+        "final_url": "https://www.incocredito.com.co/",
+        "status_code": 200,
+        "https_ok": true,
+        "redirect_chain": [
+          "200 https://www.incocredito.com.co/"
+        ],
+        "headers": {
+          "server": "nginx",
+          "x-powered-by": "PHP/8.4.4",
+          "x-content-type-options": "nosniff, nosniff",
+          "x-frame-options": "SAMEORIGIN, DENY",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "content-security-policy": "default-src: https://www.incocredito.com.co;object-src 'none';",
+          "referrer-policy": "strict-origin-when-cross-origin",
+          "permissions-policy": "accelerometer=(), ambient-light-sensor=(), autoplay=(self), camera=(), display-capture=(), encrypted-media=(self), fullscreen=(self), geolocation=(), gyroscope=(), interest-cohort=(), magnetometer=(), microphone=(), midi=(), payment=(self), picture-in-picture=(self), publickey-credentials-get=(self), screen-wake-lock=(), sync-xhr=(self), usb=(), web-share=(self), xr-spatial-tracking=()"
+        },
+        "server_fingerprint": "server=nginx | x-powered-by=PHP/8.4.4",
+        "x_powered_by": "PHP/8.4.4",
+        "feature_policy": "accelerometer=(), ambient-light-sensor=(), autoplay=(self), camera=(), display-capture=(), encrypted-media=(self), fullscreen=(self), geolocation=(), gyroscope=(), interest-cohort=(), magnetometer=(), microphone=(), midi=(), payment=(self), picture-in-picture=(self), publickey-credentials-get=(self), screen-wake-lock=(), sync-xhr=(self), usb=(), web-share=(self), xr-spatial-tracking=()",
+        "expect_ct": null,
+        "x_permitted_cross_domain": null,
+        "via": null,
+        "cf_ray": null,
+        "x_cdn": null,
+        "error": null
+      },
+      "scanned_at": "2026-05-20 06:19:21",
+      "subdomains": [],
+      "public_paths": [
+        {
+          "path": "/robots.txt",
+          "url": "https://www.incocredito.com.co/robots.txt",
+          "status_code": 403,
+          "method": "HEAD"
+        },
+        {
+          "path": "/.well-known/security.txt",
+          "url": "https://www.incocredito.com.co/.well-known/security.txt",
+          "status_code": 404,
+          "method": "HEAD"
+        },
+        {
+          "path": "/health",
+          "url": "https://www.incocredito.com.co/health",
+          "status_code": 404,
+          "method": "HEAD"
+        },
+        {
+          "path": "/api/health",
+          "url": "https://www.incocredito.com.co/api/health",
+          "status_code": 404,
+          "method": "HEAD"
+        },
+        {
+          "path": "/actuator/health",
+          "url": "https://www.incocredito.com.co/actuator/health",
+          "status_code": 404,
+          "method": "HEAD"
+        },
+        {
+          "path": "/openapi.json",
+          "url": "https://www.incocredito.com.co/openapi.json",
+          "status_code": 404,
+          "method": "HEAD"
+        },
+        {
+          "path": "/swagger.json",
+          "url": "https://www.incocredito.com.co/swagger.json",
+          "status_code": 404,
+          "method": "HEAD"
+        },
+        {
+          "path": "/v3/api-docs",
+          "url": "https://www.incocredito.com.co/v3/api-docs",
+          "status_code": 404,
+          "method": "HEAD"
+        },
+        {
+          "path": "/.well-known/openid-configuration",
+          "url": "https://www.incocredito.com.co/.well-known/openid-configuration",
+          "status_code": 404,
+          "method": "HEAD"
+        }
+      ],
+      "crt_subdomains": [
+        "mail.incocredito.com.co",
+        "www.campusvirtual.incocredito.com.co",
+        "www.incocredito.com.co"
+      ],
+      "caa_records": [],
+      "mta_sts": null,
+      "tls_rpt": null,
+      "bimi": null,
+      "san_list": [
+        "*.incocredito.com.co",
+        "incocredito.com.co"
+      ],
+      "mx_records": [],
+      "ns_records": [],
+      "urlhaus": {
+        "error": "HTTP 401"
+      },
+      "vulnerabilities": [],
+      "credential_leaks": [
+        {
+          "error": "LEAK_API_KEY no configurada"
+        }
+      ],
+      "typosquatting": [
+        {
+          "domain": "incocredito.com",
+          "ips": [
+            "54.237.127.126"
+          ]
+        }
+      ],
+      "patching": [
+        {
+          "technology": "nginx",
+          "version": "",
+          "status": "unknown",
+          "detail": "Versión no detectable desde cabeceras"
+        },
+        {
+          "technology": "php",
+          "version": "8.4.4",
+          "status": "current",
+          "detail": "Soportada hasta 2028-12-31"
+        }
+      ],
+      "supply_chain": [
+        {
+          "domain": "www.google.com",
+          "source": "script_src",
+          "resolves": true,
+          "ips": [
+            "142.251.156.119",
+            "142.251.150.119",
+            "142.251.153.119",
+            "142.251.157.119",
+            "142.251.154.119",
+            "142.251.151.119",
+            "142.251.155.119",
+            "142.251.152.119"
+          ]
+        },
+        {
+          "domain": "cdn.jsdelivr.net",
+          "source": "script_src",
+          "resolves": true,
+          "ips": [
+            "104.17.207.5",
+            "104.17.208.5"
+          ]
+        },
+        {
+          "domain": "cdnjs.cloudflare.com",
+          "source": "script_src",
+          "resolves": true,
+          "ips": [
+            "104.17.25.14",
+            "104.17.24.14"
+          ]
+        }
+      ]
+    }
+  ],
+  "matrix": [
+    {
+      "proveedor": "Incocrédito (www)",
+      "dominio": "www.incocredito.com.co",
+      "subdominios": 0,
+      "https": 200,
+      "hsts": true,
+      "csp": true,
+      "spf_dmarc": "SPF:missing DMARC:-",
+      "tls13_negociado": false,
+      "tls_version": "TLSv1.3",
+      "puertos": "80:closed 443:open",
+      "huella": "server=nginx | x-powered-by=PHP/8.4.4",
+      "rutas_interesantes": 1,
+      "crt_subdominios": 3,
+      "caa": false,
+      "mta_sts": false,
+      "tls_rpt": false,
+      "bimi": false,
+      "san_count": 2,
+      "mx_count": 0,
+      "ns_count": 0,
+      "dnssec_ok": false,
+      "dkim_count": 0,
+      "dane_count": 0,
+      "ip_reputation_count": 2,
+      "ip_reputation_clean": false,
+      "urlhaus_malicious": false,
+      "urlhaus_count": 0,
+      "vulnerability_count": 0,
+      "credential_leak_count": 0,
+      "credential_leak_error": true,
+      "typosquatting_count": 1,
+      "patching_eol": 0,
+      "patching_ending": 0,
+      "supply_chain_count": 3
+    }
+  ]
+}

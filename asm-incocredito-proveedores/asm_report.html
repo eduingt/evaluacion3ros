@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ASM — Proveedores Incocredito</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 24px; background: #0f1419; color: #e6edf3; }
+h1 { font-size: 1.25rem; font-weight: 600; }
+.muted { color: #8b949e; font-weight: 400; }
+.small { font-size: 11px; }
+table { border-collapse: collapse; width: 100%; margin-top: 16px; font-size: 13px; }
+th, td { border-bottom: 1px solid #30363d; padding: 10px 8px; text-align: left; vertical-align: top; }
+th { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+tr:hover td { background: #161b22; }
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin: 16px 0; }
+.card h2 { margin: 0 0 8px; font-size: 1rem; }
+.box { background: #0d1117; padding: 12px; border-radius: 6px; overflow: auto; font-size: 12px; max-height: 280px; }
+</style>
+</head>
+<body>
+<h1>ASM — proveedores (escaneo en vivo)</h1>
+<p class="muted">Generado: 2026-08-06 02:18:11 (UTC). DNS SPF/DMARC, subdominios (33 prefijos + crt.sh), puertos 80/443, HTTPS, cabeceras, TLS, SAN, CAA, MTA-STS, TLS-RPT, BIMI, STARTTLS.</p>
+<table>
+<thead><tr>
+<th>Proveedor</th><th>Sub</th><th>HTTPS</th><th>HSTS</th><th>CSP</th><th>CSP-W</th><th>COOK</th><th>SPF/DMARC</th><th>TLS 1.3</th><th>Puertos</th><th>Rutas</th><th>Huella</th><th>crt.sh</th><th>CAA</th><th>MTA-STS</th><th>TLS-RPT</th><th>STARTTLS</th><th>MX</th><th>NS</th><th>DNSSEC</th><th>DKIM</th><th>DANE</th><th>DNSBL</th><th>URLH</th><th>CVE</th><th>LEAK</th><th>TYPO</th><th>PATCH</th><th>TKO</th><th>SC</th><th>SC-REP</th>
+</tr></thead>
+<tbody><tr>
+<td><strong>Incocrédito (www)</strong><br><span class="muted">www.incocredito.com.co</span></td>
+<td>0</td>
+<td>200</td>
+<td>✓</td>
+<td>✓</td>
+<td>4</td>
+<td>✓</td>
+<td>SPF:missing DMARC:-</td>
+<td>✗</td>
+<td class="muted">80:closed 443:open</td>
+<td class="muted small">1</td>
+<td class="muted small">server=nginx | x-powered-by=PHP/8.4.21</td>
+<td>7</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+<td>0</td>
+<td>0</td>
+<td>✗</td>
+<td>0</td>
+<td>0</td>
+<td>2</td>
+<td>✗</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>✗</td>
+<td>3</td>
+<td>✗</td>
+<td>?</td>
+</tr></tbody>
+</table>
+
+<section class="card">
+<h2>Incocrédito (www) <span class="muted">www.incocredito.com.co</span></h2>
+<p class="muted">IPv4: 190.145.61.251 · TLS: TLSv1.3 · Cert hasta: Nov  2 11:51:52 2026 GMT</p>
+
+<p class="muted">Subdominios (crt.sh)</p><ul><li><code>drpincovalid.incocredito.com.co</code></li><li><code>incodocs.incocredito.com.co</code></li><li><code>mail.incocredito.com.co</code></li><li><code>onboardingbbva.incocredito.com.co</code></li><li><code>portalfortalece.incocredito.com.co</code></li><li><code>www.campusvirtual.incocredito.com.co</code></li><li><code>www.incocredito.com.co</code></li></ul>
+<p class="muted">SAN del certificado</p><ul><li><code>*.incocredito.com.co</code></li><li><code>incocredito.com.co</code></li></ul>
+<p class="muted">Rutas (HEAD)</p><ul><li><code>/robots.txt</code> → 403</li></ul>
+
+
+
+<p class="muted">Hallazgos de CSP</p><ul><li>🔴 [HIGH] base-uri: Falta directiva base-uri, lo que permite vectores de bypass (inyección de scripts, clickjacking, exfiltración).</li><li>🟡 [MEDIUM] frame-ancestors: Falta directiva frame-ancestors, lo que permite vectores de bypass (inyección de scripts, clickjacking, exfiltración).</li><li>🟡 [MEDIUM] form-action: Falta directiva form-action, lo que permite vectores de bypass (inyección de scripts, clickjacking, exfiltración).</li><li>⚪ [LOW] report-uri/report-to: CSP no configura report-uri ni report-to; las violaciones no serán reportadas.</li></ul>
+
+<p class="muted">Redes Sociales (OSINT)</p><p class="muted">Sin datos de redes sociales configurados. Agregue social_* al providers.json.</p>
+<p class="muted">Dependencias de terceros (Supply Chain)</p><ul><li><code>www.google.com</code> (script_src) ✓ resuelve · 142.251.156.119, 142.251.151.119, 142.251.154.119</li><li><code>cdn.jsdelivr.net</code> (script_src) ✓ resuelve · 104.17.207.5, 104.17.208.5</li><li><code>cdnjs.cloudflare.com</code> (script_src) ✓ resuelve · 104.17.24.14, 104.17.25.14</li></ul>
+<p class="muted">Reputacion de terceros (Supply Chain)</p><ul><li style=color:#f85149>⚠ DNSBL:142.251.156.119 en zen.spamhaus.org</li><li style=color:#f85149>⚠ DNSBL:142.251.156.119 en cbl.abuseat.org</li><li style=color:#f85149>⚠ DNSBL:142.251.151.119 en zen.spamhaus.org</li><li style=color:#f85149>⚠ DNSBL:142.251.151.119 en cbl.abuseat.org</li><li style=color:#f85149>⚠ DNSBL:142.251.154.119 en zen.spamhaus.org</li><li style=color:#f85149>⚠ DNSBL:142.251.154.119 en cbl.abuseat.org</li><li style=color:#f85149>⚠ DNSBL:142.251.157.119 en zen.spamhaus.org</li><li style=color:#f85149>⚠ DNSBL:142.251.157.119 en cbl.abuseat.org</li><li style=color:#f85149>⚠ DNSBL:142.251.155.119 en zen.spamhaus.org</li><li style=color:#f85149>⚠ DNSBL:142.251.155.119 en cbl.abuseat.org</li></ul>
+<p class="muted">OWASP Agentic Top 10 — Grado: ? (0%)</p>
+<p class="muted">Cabeceras HTTPS (apex /)</p>
+<pre class="box">{
+  "server": "nginx",
+  "x-powered-by": "PHP/8.4.21",
+  "x-content-type-options": "nosniff, nosniff",
+  "x-frame-options": "SAMEORIGIN, DENY",
+  "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+  "content-security-policy": "default-src: https://www.incocredito.com.co;object-src 'none';",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "accelerometer=(), ambient-light-sensor=(), autoplay=(self), camera=(), display-capture=(), encrypted-media=(self), fullscreen=(self), geolocation=(), gyroscope=(), interest-cohort=(), magnetometer=(), microphone=(), midi=(), payment=(self), picture-in-picture=(self), publickey-credentials-get=(self), screen-wake-lock=(), sync-xhr=(self), usb=(), web-share=(self), xr-spatial-tracking=()"
+}</pre>
+</section>
+</body>
+</html>

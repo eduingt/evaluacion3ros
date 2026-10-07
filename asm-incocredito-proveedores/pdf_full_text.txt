@@ -1,0 +1,1329 @@
+﻿Total pages: 24
+=== PAGE 1 (2268 chars) ===
+con la tecnologφa
+de
+INFORME DETALLADO
+Scorecard para
+Confianzaingenieros
+Generado 28 de abril de 2026
+por Johanna Fajardo (jmfajard@bancolombia.com.co), GrupoCibest
+Acerca de este informe 
+Este informe es una captura puntual de este Scorecard desde las 14:34:54 UTC del 28 de abril de 2026. No debe 
+confundirse con un resultado de prueba de penetraci≤n ni con una evaluaci≤n final.
+Obtenga una visi≤n global con SecurityScorecard 
+SecurityScorecard ofrece control automßtico continuo, informes de historial, exportaciones de datos en formato 
+CSV y muchas mßs funciones que ayudarßn a los equipos de seguridad a proteger sus organizaciones. Para 
+obtener acceso gratuito al Scorecard de su organizaci≤n, cree una cuenta hoy mismo en bit.ly/2P8okyb.
+Obtenga hoy mismo mßs informaci≤n sobre SecurityScorecard en bit.ly/2xXNg4N.
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+1 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 2 (4307 chars) ===
+┐QuΘ es SecurityScorecard?
+SecurityScorecard es un servicio de calificaci≤n (Score) de seguridad que utiliza un sencillo sistema de calificaci≤n de la A 
+(puntuaci≤n mßxima) a la F (puntuaci≤n mφnima) para calificar la seguridad general de las empresas, asφ como 10 
+importantes factores de riesgo. Una empresa con una calificaci≤n C, D o F tiene 5,4 veces mßs probabilidades de sufrir 
+una filtraci≤n importante que empresas con una calificaci≤n A o B1. Ciertos factores de riesgo, como la seguridad de las 
+aplicaciones y la cadencia de la aplicaci≤n de revisiones, tienen a·n mßs efecto sobre la probabilidad de sufrir una 
+filtraci≤n. Si se obtiene una F en lugar de una A en dichos factores, la probabilidad de que se produzca una filtraci≤n de 
+datos o un ataque es diez veces mayor.
+Obtenga mßs informaci≤n sobre el sistema de Score de SecurityScorecard enábit.ly/2zMLSmW.
+Pr≤ximos
+pasos:
+Conseguir (A)
+El Score general de esta empresa
+desde
+28 de abril de 2026
+El Score futuro
+de esta empresa
+1. Cree una cuenta
+Este archivo incluye muchos detalles, pero recuerde: se refiere solo a un momento 
+puntual. Cree una cuenta si quiere obtener acceso completo y gratuito al Scorecard 
+completo de su organizaci≤n, ademßs de auto-monitoreo continuo, informes de historial, 
+exportaciones de datos en formato CSV y otras muchas cosas.
+2. Valide su huella digital
+Una vez que tenga una cuenta, revise la huella digital de su empresa, los activos que 
+SecurityScorecard considera potencialmente atribuibles a su empresa, que afectan a las 
+calificaciones de su Scorecard. Solicite la eliminaci≤n o adici≤n de IP seg·n sea necesario.
+3. Examine los hallazgos sobre los problemas
+Investigue junto con sus equipos el contenido de su tarjeta de puntuaci≤n. La postura de 
+seguridad de su empresa saldrß ganando si se identifican cabos sueltos de los que antes 
+no eran conscientes.
+4. Corrija los problemas y mejore su Score
+Tanto si ha aplicado una correcci≤n como si ha encontrado activos que no pertenecen a su 
+empresa o desea compartir informaci≤n sobre los controles de compensaci≤n, puede 
+informarnos solucionando los problemas identificados y envißndolos para que aprobemos 
+su resoluci≤n. Nuestro equipo de suporte se encarga de gestionar las resoluciones y 
+resolverß cualquier asunto pendiente en un plazo de tres dφas hßbiles. Corrija los 
+problemas en la propia plataforma o envφe un correo electr≤nico aáSupport Portal.
+Estamos aquφ
+para
+ayudarle
+La plataforma SecurityScorecard se basa en la transparencia y la colaboraci≤n. Nuestro 
+equipo de Asistencia para fiabilidad del cliente proporciona servicios de correcci≤n y 
+resoluci≤n sin cargo alguno y estaremos encantados de trabajar con usted y sus clientes 
+para resolver cualquier problema. Si necesita ayuda en cualquier momento, contacte con 
+nosotros enviando un correoáelectr≤nico aáSupport Portal.
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+2 de 24
+Los anßlisis relacionados con la s
+...(truncated)
+
+=== PAGE 3 (2628 chars) ===
+Visi≤n general del Scorecard
+Confianzaingenieros
+Puntuaci≤n de seguridad: 49
+DOMINIO: confianzaingenieros.com
+SECTOR: DESCONOCIDO
+Factores de Riesgo
+48
+SEGURIDAD DE APLICACI╙N WEB
+6 INCIDENCIAS
+100
+CUBIT SCORE
+0 NINGUNA INCIDENCIA
+100
+ESTADO DE DNS
+0 NINGUNA INCIDENCIA
+100
+SEGURIDAD DE PUNTOS DE 
+CONEXI╙N
+0 NINGUNA INCIDENCIA
+100
+HACKER CHATTER
+0 NINGUNA INCIDENCIA
+100
+REPUTACI╙N DE IP
+0 NINGUNA INCIDENCIA
+100
+FILTRACI╙N DE 
+INFORMACI╙N
+0 NINGUNA INCIDENCIA
+90
+SEGURIDAD DE RED
+1 INCIDENCIA
+73
+CADENCIA DE APLICACI╙N DE 
+REVISIONES
+5 INCIDENCIAS
+100
+INGENIER═A SOCIAL
+0 NINGUNA INCIDENCIA
+Historial del Score en los ·ltimos 30 dφas
+En el siguiente cuadro se muestra la evoluci≤n de la clasificaci≤n de seguridad relativa de la empresa a lo largo del tiempo. 
+Los picos en la puntuaci≤n de rendimiento representan mejoras en la seguridad general, correcci≤n de incidencias 
+abiertas y mejoras en la protecci≤n de la infraestructura de la empresa. Las caφdas reflejan la introducci≤n de 
+configuraciones err≤neas en el sistema o la aplicaci≤n, o bien actividades prolongadas de malware.
+F
+D
+C
+B
+A
+0
+60
+70
+80
+90
+100
+29 mar
+5 abr
+12 abr
+19 abr
+26 abr
+confianzaingenieros.com
+Our Industry
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+3 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 4 (5443 chars) ===
+Elementos de acci≤n
+FACTOR
+GRAVEDAD
+IMPACTO EN EL
+SCORE
+PROBLEMAS DETECTADOS
+Seguridad de aplicaci≤n
+web
+-12.7
+Falta el atributo "HttpOnly" en la cookie de sesi≤n. No utilizar el atributo
+HTTP-only en una cookie de sesi≤n supone un riesgo para la seguridad, ya
+que permite que los scripts del lado del cliente, como JavaScript, accedan a
+la cookie. Esta vulnerabilidad aumenta la probabilidad de que los ataques
+tengan Θxito, en particular los incidentes de scripts de sitios (XSS) en los que
+los scripts malintencionados pueden aprovechar la ausencia del atributo
+HTTP-only para robar datos confidenciales de la sesi≤n. Los atacantes
+pueden secuestrar las sesiones de los usuarios, lo que puede dar lugar a un
+acceso no autorizado y a un posible uso indebido de la informaci≤n personal.
+-12.5
+Falta el atributo "Secure" en la cookie de sesi≤n. No incluir el atributo
+"secure" en una cookie de sesi≤n introduce un riesgo de seguridad
+significativo. Sin este atributo, la cookie se transmite a travΘs de conexiones
+seguras (HTTPS) y no seguras (HTTP), lo que la hace susceptible de ser
+interceptada por atacantes en redes no seguras. Esta vulnerabilidad expone
+informaci≤n confidencial de la sesi≤n, como los tokens de autenticaci≤n de
+usuario, a posibles escuchas y accesos no autorizados. Los atacantes podrφan
+aprovechar esta debilidad para secuestrar las sesiones de los usuarios, lo
+que provocarφa un acceso no autorizado a la cuenta y un posible uso
+indebido de los datos personales. Incluir el atributo "secure" es crucial para
+garantizar que las cookies de sesi≤n se transmitan exclusivamente a travΘs
+de canales cifrados, mitigando el riesgo de interceptaci≤n de datos y
+mejorando la seguridad general.
+-9.4
+Implementaci≤n insegura de la integridad de los recursos secundarios (SRI).
+Sin SRI, los recursos cargados externamente, tales como scripts y hojas de
+estilo, carecen de verificaci≤n de integridad. Esto los hace susceptibles a la
+manipulaci≤n. Esto crea una vφa potencial para que los atacantes inyecten
+scripts malintencionados, lo que genera vulnerabilidades de scripts de sitios
+(XSS), acceso no autorizado a datos y otras amenazas a la seguridad.
+-0.2
+Falta la polφtica de seguridad de contenido (PSC). No implementar una
+polφtica de seguridad de contenido (PSC) expone las aplicaciones web a
+diversos riesgos, que se centran principalmente en la mayor probabilidad de
+ataques de scripts de sitios (XSS). Sin una PSC, agentes malintencionados
+pueden inyectar y ejecutar scripts da±inos en un sitio web, lo que podrφa
+poner en peligro los datos de usuario, la integridad de la sesi≤n y la
+seguridad general. La ausencia de PSC tambiΘn aumenta el riesgo de
+alteraci≤n de datos, secuestro de clics y carga de contenido no seguro. Esto
+hace que la aplicaci≤n web sea mßs susceptible a los accesos no autorizados
+y la exposici≤n de datos. TambiΘn reduce la confianza de los usuarios. La
+ausencia de una PSC s≤lida abre la puerta a una serie de vulnerabilidades de
+seguridad, lo que pod
+...(truncated)
+
+=== PAGE 5 (4426 chars) ===
+FACTOR
+GRAVEDAD
+IMPACTO EN EL
+SCORE
+PROBLEMAS DETECTADOS
+-0.2
+El sitio web no implementa las prßcticas recomendadas de X-Content-Type-
+Options. No usar el encabezado "X-Content-Type-Options" presenta varios
+riesgos, incluida la posibilidad de vulnerabilidades de rastreo de tipo MIME.
+Sin este encabezado establecido en "nosniff", los navegadores pueden
+intentar interpretar el contenido en funci≤n de la heurφstica, lo que genera
+vulnerabilidades de seguridad y el riesgo de ejecutar scripts
+malintencionados. Esto podrφa exponer a los sitios web a ataques de scripts
+de sitios (XSS) en los que los atacantes inyectan c≤digo da±ino en el
+contenido. Ademßs, la ausencia del encabezado puede dar lugar a
+incoherencias entre los diferentes navegadores, lo que afecta a la
+interpretaci≤n fiable de los tipos de contenido y puede comprometer la
+seguridad e integridad de las aplicaciones web.
+Seguridad de red
+-6.5
+El servicio SSL/TLS admite un protocolo dΘbil. Un riesgo importante
+asociado con la Seguridad de la capa de transporte (TLS) es la posibilidad
+de que se produzcan vulnerabilidades en el propio protocolo o en su
+configuraci≤n. Estas vulnerabilidades podrφan ser aprovechadas por actores
+malintencionados para interceptar, manipular o espiar datos sensibles
+transmitidos a travΘs de la red. Las configuraciones TLS establecidas
+incorrectamente o los algoritmos criptogrßficos dΘbiles pueden reducir la
+seguridad del canal de comunicaci≤n y hacerlo susceptible a ataques tales
+como ataques de tipo "man in the middle", secuestro de sesi≤n o descifrado
+de datos cifrados. No actualizar rßpidamente las bibliotecas y
+configuraciones de TLS para solucionar las vulnerabilidades conocidas puede
+exacerbar a·n mßs estos riesgos, lo que podrφa provocar filtraciones de
+datos, violaciones de la privacidad y da±os a la reputaci≤n de las
+organizaciones afectadas.
+Cadencia de aplicaci≤n de
+revisiones
+-0.4
+Vulnerabilidad de gravedad crφtica CVSS v3.0 en la cadencia de aplicaci≤n de
+revisiones. Se ha observado una vulnerabilidad de gravedad crφtica en la red
+mßs de 30 dφas despuΘs de la publicaci≤n de la VEC.
+-0.4
+Vulnerabilidad de gravedad crφtica CVSS v3.0 en el servicio en la ·ltima
+observaci≤n. Durante nuestro ·ltimo anßlisis, hemos observado una
+vulnerabilidad de gravedad crφtica, que a·n puede estar expuesta
+p·blicamente.
+-2.6
+Vulnerabilidad de gravedad alta CVSS v3.0 en el servicio en la ·ltima
+observaci≤n. Hemos observado una vulnerabilidad de gravedad alta durante
+nuestro ·ltimo anßlisis, que a·n puede estar expuesta p·blicamente.
+-2.6
+Vulnerabilidad de gravedad baja CVSS v3.0 en el servicio en la ·ltima
+observaci≤n. Hemos observado durante nuestro ·ltimo anßlisis una
+vulnerabilidad de gravedad baja, que a·n puede estar expuesta
+p·blicamente.
+-2.7
+Vulnerabilidad de gravedad media CVSS v3.0 en el servicio en la ·ltima
+observaci≤n. Durante nuestro ·ltimo anßlisis, hemos observado una
+vulnerabilidad de gravedad media, que a·n puede estar expuesta
+p·blicamente.
+con la tecnolo
+...(truncated)
+
+=== PAGE 6 (4958 chars) ===
+48
+SEGURIDAD DE APLICACI╙N WEB
+El m≤dulo Seguridad de aplicaci≤n web utiliza inteligencia sobre amenazas entrantes por vulnerabilidades conocidas, que 
+se identifican mediante bases de datos CVE "whitehat", bases de datos de vulnerabilidades "blackhat" y hallazgos 
+importantes indexados por los principales motores de b·squeda. El m≤dulo se nutre de datos de varios conjuntos de 
+datos p·blicos, fuentes de terceros y un motor interno de indexaci≤n y agregaci≤n patentado.
+La puntuaci≤n determina la probabilidad de una pr≤xima filtraci≤n en la aplicaci≤n web y comprueba si existe c≤digo de 
+defacement (desfiguraci≤n). La presencia de aplicaciones vulnerables, versiones obsoletas y defacements activos se 
+utiliza para calcular la puntuaci≤n general.
+GRAVEDAD ALTA
+Falta el atributo "HttpOnly"
+en la cookie de sesi≤n
+2
+Falta el atributo "Secure" en
+la cookie de sesi≤n
+2
+Implementaci≤n insegura de
+la integridad de los recursos
+secundarios (SRI)
+2
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+Application Security
+GRAVEDAD BAJA
+Falta la polφtica de seguridad
+de contenido (PSC)
+2
+El sitio web no implementa
+las prßcticas recomendadas
+de HSTS
+2
+El sitio web no implementa
+las prßcticas recomendadas
+de X-Content-Type-Options
+2
+Falta el atributo "HttpOnly" en la cookie de sesi≤n
+No utilizar el atributo HTTP-only en una cookie de sesi≤n supone un riesgo para la seguridad, ya 
+que permite que los scripts del lado del cliente, como JavaScript, accedan a la cookie. Esta 
+vulnerabilidad aumenta la probabilidad de que los ataques tengan Θxito, en particular los 
+incidentes de scripts de sitios (XSS) en los que los scripts malintencionados pueden aprovechar 
+la ausencia del atributo HTTP-only para robar datos confidenciales de la sesi≤n. Los atacantes 
+pueden secuestrar las sesiones de los usuarios, lo que puede dar lugar a un acceso no 
+autorizado y a un posible uso indebido de la informaci≤n personal.
+-12.7 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+Una cookie de sesi≤n con el atributo HTTP-only es un 
+tipo de cookie utilizada por los sitios web para almacenar 
+temporalmente informaci≤n durante la sesi≤n de un 
+usuario. Es una medida de seguridad que restringe el 
+acceso solo a travΘs de solicitudes HTTP, lo que impide 
+que los scripts del lado del cliente (como JavaScript) 
+accedan a ella.
+- Incluya el atributo HTTP-only al configurar la cookie de 
+sesi≤n.
+- Establezca el atributo SameSite con los valores "strict" o 
+"lax" para controlar cußndo se envφan cookies con solicitudes 
+entre sitios. Esto reduce el riesgo de ataques de falsificaci≤n 
+de solicitudes entre sitios (CSRF).
+- Habilite la marca "secure" para asegurarse de que la cookie 
+de sesi≤n solo se transmita a travΘs de conexiones cifradas 
+(HTTPS). Esto evita la interceptaci≤n por parte de los 
+atacantes en redes no seguras.
+- Cambie peri≤dicamente los identificadores de sesi≤n para 
+limitar las oportunidades para los atacantes que intentan 
+secuestrar sesiones a travΘs del robo de cookies de se
+...(truncated)
+
+=== PAGE 7 (4848 chars) ===
+2 resultados
+DOMINIO
+URL
+OBSERVACIONES
+FECHA DE ┌LTIMA OBSERVACI╙N
+confianzaingenieros.com
+https://confianzaingenieros.com/
+3
+26/4/2026, 23:30:44
+confianzaingenieros.com
+https://www.confianzaingenieros.com/ 3
+21/4/2026, 21:58:07
+Falta el atributo "Secure" en la cookie de sesi≤n
+No incluir el atributo "secure" en una cookie de sesi≤n introduce un riesgo de seguridad 
+significativo. Sin este atributo, la cookie se transmite a travΘs de conexiones seguras (HTTPS) y 
+no seguras (HTTP), lo que la hace susceptible de ser interceptada por atacantes en redes no 
+seguras. Esta vulnerabilidad expone informaci≤n confidencial de la sesi≤n, como los tokens de 
+autenticaci≤n de usuario, a posibles escuchas y accesos no autorizados. Los atacantes podrφan 
+aprovechar esta debilidad para secuestrar las sesiones de los usuarios, lo que provocarφa un 
+acceso no autorizado a la cuenta y un posible uso indebido de los datos personales. Incluir el 
+atributo "secure" es crucial para garantizar que las cookies de sesi≤n se transmitan 
+exclusivamente a travΘs de canales cifrados, mitigando el riesgo de interceptaci≤n de datos y 
+mejorando la seguridad general.
+-12.5 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+Una cookie de sesi≤n es un peque±o fragmento de datos 
+que un sitio web almacena temporalmente en el 
+dispositivo de un usuario durante su visita. Se utiliza 
+habitualmente para almacenar temporalmente 
+informaci≤n sobre la sesi≤n del usuario, como las 
+credenciales de inicio de sesi≤n o las preferencias. Las 
+cookies de sesi≤n estßn dise±adas para ser temporales y, 
+por lo general, se eliminan cuando el usuario cierra el 
+navegador. El atributo "secure", cuando se aplica a una 
+cookie de sesi≤n, garantiza que solo se transmita a travΘs 
+de conexiones seguras y cifradas (HTTPS). Esto a±ade 
+una capa adicional de protecci≤n contra posibles 
+amenazas de seguridad durante el intercambio de datos 
+entre el navegador del usuario y el servidor.
+- Habilite HTTPS en su sitio web para garantizar una 
+comunicaci≤n segura.
+- Establezca explφcitamente el atributo "secure" al crear o 
+actualizar la cookie de sesi≤n.
+- Implemente prßcticas seguras para almacenar cookies de 
+sesi≤n en el lado del servidor.
+2 resultados
+DOMINIO
+URL
+OBSERVACIONES
+FECHA DE ┌LTIMA OBSERVACI╙N
+confianzaingenieros.com
+https://confianzaingenieros.com/
+3
+26/4/2026, 23:30:44
+confianzaingenieros.com
+https://www.confianzaingenieros.com/ 3
+21/4/2026, 21:58:07
+Falta la polφtica de seguridad de contenido (PSC)
+No implementar una polφtica de seguridad de contenido (PSC) expone las aplicaciones web a 
+diversos riesgos, que se centran principalmente en la mayor probabilidad de ataques de scripts 
+de sitios (XSS). Sin una PSC, agentes malintencionados pueden inyectar y ejecutar scripts da±inos 
+en un sitio web, lo que podrφa poner en peligro los datos de usuario, la integridad de la sesi≤n y la 
+seguridad general. La ausencia de PSC tambiΘn aumenta el riesgo de alteraci≤n de datos, 
+secuestro de clics y carga de 
+...(truncated)
+
+=== PAGE 8 (5530 chars) ===
+Descripci≤n
+Recomendaci≤n
+Una polφtica de seguridad de contenido (PSC) es un 
+estßndar de seguridad web que se implementa a travΘs 
+de encabezados HTTP en los navegadores web. Sirve 
+para protegerse contra ataques de scripts de sitios (XSS) 
+mediante la definici≤n de reglas que especifican quΘ 
+fuentes estßn permitidas para cargar scripts, estilos y 
+otros recursos en una pßgina web. Al indicar al navegador 
+los dominios y tipos de contenido de confianza, una PSC 
+contribuye a mejorar la seguridad general de las 
+aplicaciones web, lo que reduce el riesgo de ejecuci≤n de 
+c≤digo no autorizado y actividad malintencionada.
+- Implemente una polφtica de seguridad de contenido (PSC) 
+mediante la configuraci≤n de encabezados HTTP en su 
+servidor web.
+- Defina claramente las fuentes de confianza para scripts, 
+estilos, imßgenes, fuentes, etc., usando directivas como 
+ôscript-srcö, ôstyle-srcö e ôimg-srcö.
+- Utilice valores nonce o hash para scripts y estilos en lφnea 
+para permitir excepciones especφficas y a la vez mantener la 
+seguridad.
+- Revise y actualice peri≤dicamente la configuraci≤n de la 
+PSC para adaptarla a los cambios y a las amenazas de 
+seguridad emergentes.
+- Pruebe la eficacia de la PSC simulando posibles escenarios 
+de ataque y supervise los informes de infracci≤n.
+- Instruya a los equipos de desarrollo sobre las PSC y las 
+prßcticas de codificaci≤n segura para evitar la introducci≤n 
+de vulnerabilidades.
+- Considere la posibilidad de una implementaci≤n gradual, 
+comenzando con una polφtica mßs permisiva y endureciendo 
+gradualmente las restricciones.
+2 resultados
+DOMINIO
+ESQUEMA
+OBSERVACIONES
+URL FINAL
+FECHA DE ┌LTIMA
+OBSERVACI╙N
+confianzaingenieros.com
+https
+1
+https://confianzaingenieros.co
+m/
+26/4/2026, 23:30:44
+confianzaingenieros.com
+https
+1
+https://www.confianzaingenier
+os.com/
+21/4/2026, 21:58:07
+El sitio web no implementa las prßcticas
+recomendadas de HSTS
+No implementar HTTP Strict Transport Security (HSTS) significa exponer potencialmente los 
+sitios web a ataques de tipo "man in the middle" y posibles brechas de seguridad. Sin HSTS, los 
+agentes malintencionados podrφan aprovechar vulnerabilidades tales como degradaci≤n de 
+protocolos o secuestro de cookies, lo cual pondrφa en peligro la confidencialidad e integridad de 
+los datos confidenciales de los usuarios. La ausencia de una polφtica estricta que exija a los 
+navegadores que impongan conexiones seguras a travΘs de HTTPS aumenta la probabilidad de 
+que los atacantes intercepten y manipulen la comunicaci≤n entre los usuarios y el sitio web. 
+HSTS act·a como un mecanismo de defensa crucial. Su ausencia hace que las aplicaciones web 
+sean mßs vulnerables a diversas formas de acceso no autorizado e interceptaci≤n de datos.
+<-0.1 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+HTTP Strict Transport Security (HSTS) es un mecanismo 
+de seguridad web que ayuda a proteger los sitios web 
+contra ataques de tipo "man in the middle". Cuando un 
+sitio web estß configurado con HSTS, ind
+...(truncated)
+
+=== PAGE 9 (4455 chars) ===
+- Revise y actualice peri≤dicamente la polφtica HSTS para 
+adaptarla a los cambios de su sitio web y las prßcticas 
+recomendadas de seguridad.
+- Pruebe la eficacia de la implementaci≤n de HSTS para 
+verificar que los navegadores establecen correctamente 
+conexiones seguras.
+- Un encabezado HSTS aceptable declararφa algo como esto: 
+"Strict-Transport-Security: max-age=31536000; 
+includeSubDomains;"
+2 resultados
+AN┴LISIS
+DOMINIO
+ESQUEMA
+OBSERVACIONES
+URL FINAL
+FECHA DE ┌LTIMA
+OBSERVACI╙N
+no_hsts
+confianzaingenieros.com https
+1
+https://confianzaingenier
+os.com/
+26/4/2026, 23:30:44
+no_hsts
+confianzaingenieros.com https
+1
+https://www.confianzaing
+enieros.com/
+21/4/2026, 21:58:07
+Implementaci≤n insegura de la integridad de los
+recursos secundarios (SRI)
+Sin SRI, los recursos cargados externamente, tales como scripts y hojas de estilo, carecen de 
+verificaci≤n de integridad. Esto los hace susceptibles a la manipulaci≤n. Esto crea una vφa potencial 
+para que los atacantes inyecten scripts malintencionados, lo que genera vulnerabilidades de 
+scripts de sitios (XSS), acceso no autorizado a datos y otras amenazas a la seguridad.
+-9.4 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+La integridad de los recursos secundarios (SRI) es una 
+caracterφstica de seguridad del desarrollo web dise±ada 
+para garantizar la integridad de los recursos cargados 
+externamente en una pßgina web. Entre estos se 
+cuentan scripts, hojas de estilo y fuentes. Con SRI, los 
+desarrolladores incluyen un hash criptogrßfico del 
+contenido del recurso esperado en el HTML. Cuando un 
+usuario visita la pßgina web, el navegador compara este 
+hash con el contenido real obtenido del origen externo. Si 
+los hashes coinciden, eso significa que el recurso no se ha 
+manipulado ni estß comprometido.
+- Aseg·rese de que se especifiquen hashes criptogrßficos 
+precisos para todos los recursos cargados externamente 
+utilizando atributos SRI en el c≤digo HTML.
+- Revise y actualice peri≤dicamente los hashes criptogrßficos 
+para que se ajusten a los cambios del contenido de los 
+recursos.
+- Implemente prßcticas s≤lidas de validaci≤n y desinfecci≤n 
+de entradas para prevenir ataques de inyecci≤n.
+- Utilice CSP para restringir los orφgenes de recursos. Esto 
+agrega una capa adicional de control sobre la ejecuci≤n del 
+contenido.
+- Realice auditorφas de seguridad peri≤dicas y pruebas de 
+penetraci≤n para identificar y solucionar rßpidamente las 
+vulnerabilidades.
+2 resultados
+DOMINIO
+ESQUEMA
+OBSERVACIONES
+FECHA DE ┌LTIMA OBSERVACI╙N
+confianzaingenieros.com
+https
+1
+26/4/2026, 23:30:44
+confianzaingenieros.com
+https
+1
+21/4/2026, 21:58:07
+El sitio web no implementa las prßcticas
+recomendadas de X-Content-Type-Options
+No usar el encabezado "X-Content-Type-Options" presenta varios riesgos, incluida la posibilidad 
+de vulnerabilidades de rastreo de tipo MIME. Sin este encabezado establecido en "nosniff", los 
+navegadores pueden intentar interpretar el contenido en funci≤n de la heurφstica, lo que genera 
+-0.2 IMPAC
+...(truncated)
+
+=== PAGE 10 (3332 chars) ===
+vulnerabilidades de seguridad y el riesgo de ejecutar scripts malintencionados. Esto podrφa 
+exponer a los sitios web a ataques de scripts de sitios (XSS) en los que los atacantes inyectan 
+c≤digo da±ino en el contenido. Ademßs, la ausencia del encabezado puede dar lugar a 
+incoherencias entre los diferentes navegadores, lo que afecta a la interpretaci≤n fiable de los 
+tipos de contenido y puede comprometer la seguridad e integridad de las aplicaciones web.
+Descripci≤n
+Recomendaci≤n
+"X-Content-Type-Options" es un encabezado HTTP que 
+mejora la seguridad web al influir en la forma en que un 
+navegador interpreta el tipo de contenido utilizado en una 
+respuesta HTTP. Cuando se establece en "nosniff", este 
+encabezado indica al navegador que se adhiera 
+estrictamente al tipo de contenido declarado y se 
+abstenga de rastrear o interpretar el contenido de 
+formas alternativas. Esta medida ayuda a evitar posibles 
+problemas de seguridad relacionados con la confusi≤n de 
+tipos MIME y promueve un entorno de navegaci≤n mßs 
+seguro al garantizar que el navegador procese con 
+precisi≤n el contenido seg·n lo previsto por el servidor.
+- Configure su servidor web para incluir el encabezado "X-
+Content-Type-Options" en las respuestas HTTP.
+- Establezca el encabezado "X-Content-Type-Options" en las 
+respuestas HTTP y config·relo con el valor "nosniff" para 
+indicar a los navegadores que no realicen el rastreo de tipo 
+MIME.
+- Considere la posibilidad de implementar una polφtica de 
+seguridad de contenido (PSC) que complemente X-Content-
+Type-Options.
+2 resultados
+AN┴LISIS
+DOMINIO
+ESQUEMA
+OBSERVACIONES
+URL FINAL
+FECHA DE ┌LTIMA
+OBSERVACI╙N
+x_content_type_options_
+missing
+confianzaingenieros.com https
+1
+https://confianzaingenier
+os.com/
+26/4/2026, 23:30:44
+x_content_type_options_
+missing
+confianzaingenieros.com https
+1
+https://www.confianzaing
+enieros.com/
+21/4/2026, 21:58:07
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+10 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONT
+...(truncated)
+
+=== PAGE 11 (2073 chars) ===
+100 CUBIT SCORE
+Este m≤dulo patentado mide distintos problemas de seguridad que una empresa podrφa tener. Por ejemplo, 
+comprobamos las bases de datos p·blicas sobre inteligencia de amenazas en busca de direcciones IP que hayan sido 
+se±aladas. Estas configuraciones err≤neas pueden presentar una alta vulnerabilidad y podrφan causar da±os significativos 
+a la privacidad de sus datos e infraestructura.
+GRAVEDAD ALTA
+No hay Problemas de gravedad alta para Cubit
+Score
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+Cubit Score
+GRAVEDAD BAJA
+No hay Problemas de gravedad baja para Cubit
+Score
+No se encontr≤ ning·n problema
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+11 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 12 (2080 chars) ===
+100 ESTADO DE DNS
+Este m≤dulo mide el estado y la configuraci≤n de los ajustes DNS de una empresa. Verifica que no se hayan producido 
+eventos malintencionados en el historial del DNS pasivo de la red de la empresa, ayuda a validar que los servidores de 
+correo tengan la protecci≤n adecuada para evitar la falsificaci≤n (o "spoofing") y permite verificar que los servidores DNS 
+estΘn configurados correctamente.
+GRAVEDAD ALTA
+No hay Problemas de gravedad alta para DNS
+Health
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+DNS Health
+GRAVEDAD BAJA
+No hay Problemas de gravedad baja para DNS
+Health
+No se encontr≤ ning·n problema
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+12 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 13 (2126 chars) ===
+100 SEGURIDAD DE PUNTOS DE CONEXI╙N
+El m≤dulo Seguridad de puntos de conexi≤n realiza un seguimiento de los puntos de identificaci≤n que se extraen de 
+metadatos relacionados con el sistema operativo, el navegador web y los complementos activos relacionados. La 
+informaci≤n recopilada permite a las empresas identificar versiones obsoletas de estos puntos de datos que pueden dar 
+lugar a vulnerabilidad y ataques en el lado del cliente.
+GRAVEDAD ALTA
+No hay Problemas de gravedad alta para
+Endpoint Security
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+Endpoint Security
+GRAVEDAD BAJA
+No hay Problemas de gravedad baja para
+Endpoint Security
+No se encontr≤ ning·n problema
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+13 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 14 (2286 chars) ===
+100 HACKER CHATTER
+El m≤dulo Hacker Chatter de SecurityScorecard es un sistema automatizado de recopilaci≤n y agregaci≤n para el anßlisis 
+de m·ltiples flujos de charla de piratas informßticos en sitios clandestinos. Continuamente se monitorizan, recopilan y 
+agregan foros, IRC, redes sociales y otros repositorios p·blicos de conversaciones de la comunidad de piratas 
+informßticos para localizar menciones a nombres de empresas y sitios web. La puntuaci≤n de Hacker Chatter es una 
+clasificaci≤n informativa de indicadores basada en la cantidad de indicadores detectados por los sensores de recopilaci≤n.
+GRAVEDAD ALTA
+No hay Problemas de gravedad alta para
+Hacker Chatter
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+Hacker Chatter
+GRAVEDAD BAJA
+No hay Problemas de gravedad baja para
+Hacker Chatter
+No se encontr≤ ning·n problema
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+14 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 15 (2347 chars) ===
+100 REPUTACI╙N DE IP
+Los m≤dulos Reputaci≤n de IP y Exposici≤n al malware utilizan la infraestructura de sistemas "sinkhole" de 
+SecurityScorecard, asφ como una combinaci≤n de fuentes de malware OSINT y asociaciones de intercambio de datos de 
+inteligencia de amenazas de terceros. El sistema "sinkhole" de SecurityScorecard ingiere millones de se±ales de malware 
+procedentes de infraestructuras de comando y control (C2) de todo el mundo. Los datos entrantes se procesan y 
+atribuyen a las empresas. La cantidad y duraci≤n de las infecciones por malware se utilizan como factor determinante 
+para calcular el indicador clave de amenaza del m≤dulo Exposici≤n al malware.
+GRAVEDAD ALTA
+No hay Problemas de gravedad alta para IP
+Reputation
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para IP
+Reputation
+GRAVEDAD BAJA
+No hay Problemas de gravedad baja para IP
+Reputation
+No se encontr≤ ning·n problema
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+15 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 16 (2088 chars) ===
+100 FILTRACI╙N DE INFORMACI╙N
+Este m≤dulo Filtraci≤n de informaci≤n hace uso de las capacidades de monitorizaci≤n de charlas y supervisi≤n de la Deep 
+Web para identificar las credenciales comprometidas que los piratas informßticos estßn haciendo circular. Se trata de 
+filtraciones de datos masivas anunciadas p·blicamente, asφ como filtraciones e intercambios mßs peque±os entre piratas 
+informßticos.
+GRAVEDAD ALTA
+No hay Problemas de gravedad alta para
+Information Leak
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+Information Leak
+GRAVEDAD BAJA
+No hay Problemas de gravedad baja para
+Information Leak
+No se encontr≤ ning·n problema
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+16 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 17 (4788 chars) ===
+90
+SEGURIDAD DE RED
+El m≤dulo Seguridad de red comprueba los conjuntos de datos p·blicos en busca de pruebas de puertos abiertos de alto 
+riesgo o inseguros dentro de la red de la empresa. Los puertos inseguros a menudo se pueden aprovechamiento para 
+permitir que un atacante eluda el proceso de inicio de sesi≤n u obtenga un acceso profundo al sistema. Si estß mal 
+configurado, el puerto abierto puede actuar como punto de entrada entre la estaci≤n de trabajo de un pirata informßtico 
+y su red interna.
+GRAVEDAD ALTA
+El servicio SSL/TLS admite
+un protocolo dΘbil
+1
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+Network Security
+GRAVEDAD BAJA
+No hay Problemas de gravedad baja para
+Network Security
+El servicio SSL/TLS admite un protocolo dΘbil
+Un riesgo importante asociado con la Seguridad de la capa de transporte (TLS) es la posibilidad 
+de que se produzcan vulnerabilidades en el propio protocolo o en su configuraci≤n. Estas 
+vulnerabilidades podrφan ser aprovechadas por actores malintencionados para interceptar, 
+manipular o espiar datos sensibles transmitidos a travΘs de la red. Las configuraciones TLS 
+establecidas incorrectamente o los algoritmos criptogrßficos dΘbiles pueden reducir la seguridad 
+del canal de comunicaci≤n y hacerlo susceptible a ataques tales como ataques de tipo "man in the 
+middle", secuestro de sesi≤n o descifrado de datos cifrados. No actualizar rßpidamente las 
+bibliotecas y configuraciones de TLS para solucionar las vulnerabilidades conocidas puede 
+exacerbar a·n mßs estos riesgos, lo que podrφa provocar filtraciones de datos, violaciones de la 
+privacidad y da±os a la reputaci≤n de las organizaciones afectadas.
+-6.5 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+La Seguridad de la capa de transporte (TLS) es un 
+protocolo criptogrßfico dise±ado para proporcionar 
+comunicaci≤n segura a travΘs de una red informßtica, 
+generalmente Internet. Garantiza la privacidad y la 
+integridad de los datos entre aplicaciones cifrando los 
+datos transmitidos entre ellas. TLS establece una 
+conexi≤n segura a travΘs de un proceso de negociaci≤n 
+entre el cliente y el servidor, conocido como protocolo de 
+enlace TLS. Durante este apret≤n de manos, las partes 
+acuerdan algoritmos de cifrado, intercambian claves 
+criptogrßficas y verifican las identidades de cada uno. Una 
+vez que se establece la conexi≤n segura, los datos 
+transmitidos entre el cliente y el servidor se cifran, 
+haciΘndolos inaccesibles para partes no autorizadas que 
+puedan intentar interceptarlos o manipularlos. TLS se usa 
+ampliamente para proteger varios protocolos de Internet, 
+incluida la navegaci≤n web, el correo electr≤nico, la 
+mensajerφa instantßnea y las transferencias de archivos, y 
+protege la informaci≤n confidencial contra escuchas y 
+accesos no autorizados.
+- Implemente algoritmos criptogrßficos s≤lidos y longitudes 
+de clave recomendadas por los estßndares de seguridad.
+- Actualice peri≤dicamente las bibliotecas y configuraciones 
+de TLS para aplicar r
+...(truncated)
+
+=== PAGE 18 (4177 chars) ===
+73
+CADENCIA DE APLICACI╙N DE REVISIONES
+El m≤dulo Cadencia de aplicaci≤n de revisiones analiza la rapidez con la que una empresa reacciona a las vulnerabilidades 
+para medir las prßcticas de aplicaci≤n de revisiones. Analizamos la velocidad a la que una empresa necesita hacer 
+correcciones y aplicar revisiones en comparaci≤n con empresas similares.
+GRAVEDAD ALTA
+No hay Problemas de gravedad alta para
+Patching Cadence
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+Patching Cadence
+GRAVEDAD BAJA
+Vulnerabilidad de gravedad
+crφtica CVSS v3.0 en la
+cadencia de aplicaci≤n de
+revisiones
+2
+Vulnerabilidad de gravedad
+crφtica CVSS v3.0 en el
+servicio en la ·ltima
+observaci≤n
+2
+Vulnerabilidad de gravedad
+alta CVSS v3.0 en el servicio
+en la ·ltima observaci≤n
+24
+Vulnerabilidad de gravedad
+baja CVSS v3.0 en el servicio
+en la ·ltima observaci≤n
+3
+Vulnerabilidad de gravedad
+media CVSS v3.0 en el
+servicio en la ·ltima
+observaci≤n
+18
+Vulnerabilidad de gravedad crφtica CVSS v3.0 en la
+cadencia de aplicaci≤n de revisiones
+Se ha observado una vulnerabilidad de gravedad crφtica en la red mßs de 30 dφas despuΘs de la 
+publicaci≤n de la VEC.
+-0.4 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+Seg·n los datos del anßlisis, la empresa presentaba una 
+vulnerabilidad VEC de gravedad crφtica que llevaba 
+abierta mßs de 30 dφas despuΘs de la publicaci≤n de la 
+VEC. Las VEC de gravedad crφtica son las que tienen una 
+gravedad CVSS documentada entre 9.0 y 10.0. En el caso 
+de vulnerabilidades de gravedad crφtica, es recomendable 
+mitigar dicha vulnerabilidad o implementar la revisi≤n 
+correspondiente en un plazo de 30 dφas. Los detalles de 
+cada vulnerabilidad se enumeran en la tabla siguiente.
+Monitoree las listas CVE y los repositorios de 
+vulnerabilidades en busca de c≤digo malintencionado que 
+pueda afectar a su infraestructura. Suscrφbase al canal RSS 
+NVD (base de datos nacional de vulnerabilidades) o a otros 
+canales para recibir alertas sobre las nuevas 
+vulnerabilidades a medida que se publiquen. Mantenga un 
+programa de actualizaci≤n peri≤dica para todo el software y 
+hardware en uso de su empresa, asegurßndose de que se 
+implementen las ·ltimas revisiones a medida que se 
+publiquen.
+2 resultados
+VULNERABILIDAD
+DIRECCI╙N IP
+PUERTO
+┌LTIMA OBSERVACI╙N DE
+APERTURA
+FECHA DE PUBLICACI╙N
+DE VULNERABILIDAD
+CVE-2023-51385
+174.138.55.125
+22
+31/3/2026, 5:57:53
+18/12/2023, 0:00:00
+Descripci≤n de vulnerabilidad: "In ssh in OpenSSH before 9.6, OS command injection might occur if a user name or host name has shelà
+CVE-2023-38408
+174.138.55.125
+22
+31/3/2026, 5:57:53
+20/7/2023, 0:00:00
+Descripci≤n de vulnerabilidad: "The PKCS#11 feature in ssh-agent in OpenSSH before 9.3p2 has an insufficiently trustworthy search pà
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+18 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre lo
+...(truncated)
+
+=== PAGE 19 (5498 chars) ===
+Vulnerabilidad de gravedad crφtica CVSS v3.0 en el
+servicio en la ·ltima observaci≤n
+Durante nuestro ·ltimo anßlisis, hemos observado una vulnerabilidad de gravedad crφtica, que a·n 
+puede estar expuesta p·blicamente.
+-0.4 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+Las Vulnerabilidades y exposiciones comunes (CVE) son 
+listas de vulnerabilidades en software y hardware de 
+conocimiento p·blico. Con cada CVE se incluye un ID, una 
+descripci≤n de la vulnerabilidad y los nombres y versiones 
+de los productos afectados por dicha vulnerabilidad.
+Los productos de software y hardware suelen informar 
+automßticamente sobre el nombre y la versi≤n de cada 
+producto cuando los hosts se conectan a ellos. Al buscar 
+en la lista de CVE y cruzar esos datos con los nombres y 
+versiones de los productos que se encuentren en la red 
+de la empresa en cuesti≤n, podemos inferir la presencia o 
+ausencia de vulnerabilidades.
+Actualice o aplique revisiones al software y al hardware 
+afectados. Habilite las actualizaciones automßticas si estßn 
+disponibles en su proveedor de software y permitidas en su 
+entorno. Supervise las listas de CVE y los repositorios de 
+vulnerabilidades en busca de c≤digo de vulnerabilidades que 
+puedan afectar a su infraestructura. Suscrφbase a la lista de 
+correo de Bugtraq para recibir alertas sobre nuevas 
+vulnerabilidades a medida que se publiquen. Mantenga una 
+programaci≤n de actualizaci≤n regular para todo el software 
+y hardware en uso dentro de su organizaci≤n, asegurßndose 
+de que se apliquen las ·ltimas revisiones tan pronto como se 
+publiquen.
+2 resultados
+VULNERABILIDAD
+DIRECCI╙N IP
+PUERTO
+FECHA DE PUBLICACI╙N
+DE CVE
+FECHA DE ┌LTIMA
+OBSERVACI╙N
+CVE-2023-38408
+174.138.55.125
+22
+20/7/2023, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "The PKCS#11 feature in ssh-agent in OpenSSH before 9.3p2 has an insufficiently trustworthy search pà
+CVE-2023-51385
+174.138.55.125
+22
+18/12/2023, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "In ssh in OpenSSH before 9.6, OS command injection might occur if a user name or host name has shelà
+Vulnerabilidad de gravedad alta CVSS v3.0 en el
+servicio en la ·ltima observaci≤n
+Hemos observado una vulnerabilidad de gravedad alta durante nuestro ·ltimo anßlisis, que a·n 
+puede estar expuesta p·blicamente.
+-2.6 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+Las Vulnerabilidades y exposiciones comunes (CVE) son 
+listas de vulnerabilidades en software y hardware de 
+conocimiento p·blico. Con cada CVE se incluye un ID, una 
+descripci≤n de la vulnerabilidad y los nombres y versiones 
+de los productos afectados por dicha vulnerabilidad.
+Los productos de software y hardware suelen informar 
+automßticamente sobre el nombre y la versi≤n de cada 
+producto cuando los hosts se conectan a ellos. Al buscar 
+en la lista de CVE y cruzar esos datos con los nombres y 
+versiones de los productos que se encuentren en la red 
+de la empresa en cuesti≤n, podemos inferir la presencia o 
+ausencia de vulnerab
+...(truncated)
+
+=== PAGE 20 (7463 chars) ===
+VULNERABILIDAD
+DIRECCI╙N IP
+PUERTO
+FECHA DE PUBLICACI╙N
+DE CVE
+FECHA DE ┌LTIMA
+OBSERVACI╙N
+Descripci≤n de vulnerabilidad: "Some HTTP/2 implementations are vulnerable to a header leak, potentially leading to a denial of serà
+CVE-2019-9513
+174.138.55.125
+80
+13/8/2019, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "Some HTTP/2 implementations are vulnerable to resource loops, potentially leading to a denial of seà
+CVE-2023-44487
+174.138.55.125
+443
+10/10/2023, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "The HTTP/2 protocol allows a denial of service (server resource consumption) because request cancelà
+CVE-2021-41617
+174.138.55.125
+22
+26/9/2021, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "sshd in OpenSSH 6.2 through 8.x before 8.8, when certain non-default configurations are used, allowà
+CVE-2021-23017
+174.138.55.125
+80
+1/6/2021, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "A security issue in nginx resolver was identified, which might allow an attacker who is able to forà
+CVE-2021-3618
+174.138.55.125
+80
+23/3/2022, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "ALPACA is an application layer protocol content confusion attack, exploiting TLS servers implementià
+CVE-2022-41742
+174.138.55.125
+443
+19/10/2022, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "NGINX Open Source before versions 1.23.2 and 1.22.1, NGINX Open Source Subscription before versionsà
+CVE-2022-41741
+174.138.55.125
+80
+19/10/2022, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "NGINX Open Source before versions 1.23.2 and 1.22.1, NGINX Open Source Subscription before versionsà
+CVE-2018-16845
+174.138.55.125
+443
+7/11/2018, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "nginx before versions 1.15.6, 1.14.1 has a vulnerability in the ngx_http_mp4_module, which might alà
+CVE-2022-41741
+174.138.55.125
+443
+19/10/2022, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "NGINX Open Source before versions 1.23.2 and 1.22.1, NGINX Open Source Subscription before versionsà
+CVE-2018-16844
+174.138.55.125
+80
+7/11/2018, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "nginx before versions 1.15.6 and 1.14.1 has a vulnerability in the implementation of HTTP/2 that caà
+CVE-2018-16844
+174.138.55.125
+443
+7/11/2018, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "nginx before versions 1.15.6 and 1.14.1 has a vulnerability in the implementation of HTTP/2 that caà
+CVE-2021-3618
+174.138.55.125
+443
+23/3/2022, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "ALPACA is an application layer protocol content confusion attack, exploiting TLS servers implementià
+CVE-2019-9511
+174.138.55.125
+443
+13/8/2019, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "Some HTTP/2 implementations are vulnerable to window size manipulation and stream prioritization maà
+CVE-2023-44487
+174.138.55.125
+80
+10/10/2023, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "The HTTP/2 pro
+...(truncated)
+
+=== PAGE 21 (6229 chars) ===
+versiones de los productos que se encuentren en la red 
+de la empresa en cuesti≤n, podemos inferir la presencia o 
+ausencia de vulnerabilidades.
+y hardware en uso dentro de su organizaci≤n, asegurßndose 
+de que se apliquen las ·ltimas revisiones tan pronto como se 
+publiquen.
+3 resultados
+VULNERABILIDAD
+DIRECCI╙N IP
+PUERTO
+FECHA DE PUBLICACI╙N
+DE CVE
+FECHA DE ┌LTIMA
+OBSERVACI╙N
+CVE-2025-61985
+174.138.55.125
+22
+6/10/2025, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "ssh in OpenSSH before 10.1 allows the '\\0' character in an ssh:// URI, potentially leading to codeà
+CVE-2025-61984
+174.138.55.125
+22
+6/10/2025, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "ssh in OpenSSH before 10.1 allows control characters in usernames that originate from certain possià
+CVE-2021-36368
+174.138.55.125
+22
+13/3/2022, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "An issue was discovered in OpenSSH before 8.9. If a client is using public-key authentication with à
+Vulnerabilidad de gravedad media CVSS v3.0 en el
+servicio en la ·ltima observaci≤n
+Durante nuestro ·ltimo anßlisis, hemos observado una vulnerabilidad de gravedad media, que a·n 
+puede estar expuesta p·blicamente.
+-2.7 IMPACTO EN EL SCORE
+Descripci≤n
+Recomendaci≤n
+Las Vulnerabilidades y exposiciones comunes (CVE) son 
+listas de vulnerabilidades en software y hardware de 
+conocimiento p·blico. Con cada CVE se incluye un ID, una 
+descripci≤n de la vulnerabilidad y los nombres y versiones 
+de los productos afectados por dicha vulnerabilidad.
+Los productos de software y hardware suelen informar 
+automßticamente sobre el nombre y la versi≤n de cada 
+producto cuando los hosts se conectan a ellos. Al buscar 
+en la lista de CVE y cruzar esos datos con los nombres y 
+versiones de los productos que se encuentren en la red 
+de la empresa en cuesti≤n, podemos inferir la presencia o 
+ausencia de vulnerabilidades.
+Actualice o aplique revisiones al software y al hardware 
+afectados. Habilite las actualizaciones automßticas si estßn 
+disponibles en su proveedor de software y permitidas en su 
+entorno. Supervise las listas de CVE y los repositorios de 
+vulnerabilidades en busca de c≤digo de vulnerabilidades que 
+puedan afectar a su infraestructura. Suscrφbase a la lista de 
+correo de Bugtraq para recibir alertas sobre nuevas 
+vulnerabilidades a medida que se publiquen. Mantenga una 
+programaci≤n de actualizaci≤n regular para todo el software 
+y hardware en uso dentro de su organizaci≤n, asegurßndose 
+de que se apliquen las ·ltimas revisiones tan pronto como se 
+publiquen.
+18 resultados
+VULNERABILIDAD
+DIRECCI╙N IP
+PUERTO
+FECHA DE PUBLICACI╙N
+DE CVE
+FECHA DE ┌LTIMA
+OBSERVACI╙N
+CVE-2016-20012
+174.138.55.125
+22
+15/9/2021, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "OpenSSH through 8.7 allows remote attackers, who have a suspicion that a certain combination of useà
+CVE-2023-48795
+174.138.55.125
+22
+18/12/2023, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "The SSH tran
+...(truncated)
+
+=== PAGE 22 (3091 chars) ===
+VULNERABILIDAD
+DIRECCI╙N IP
+PUERTO
+FECHA DE PUBLICACI╙N
+DE CVE
+FECHA DE ┌LTIMA
+OBSERVACI╙N
+Descripci≤n de vulnerabilidad: "When multiple server blocks are configured to share the same IP address and port, an attacker can uà
+CVE-2018-20685
+174.138.55.125
+22
+10/1/2019, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "In OpenSSH 7.9, scp.c in the scp client allows remote SSH servers to bypass intended access restricà
+CVE-2024-7347
+174.138.55.125
+443
+14/8/2024, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "NGINX Open Source and NGINX Plus have a vulnerability in the ngx_http_mp4_module, which might allowà
+CVE-2025-32728
+174.138.55.125
+22
+10/4/2025, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "In sshd in OpenSSH before 10.0, the DisableForwarding directive does not adhere to the documentatioà
+CVE-2019-20372
+174.138.55.125
+80
+9/1/2020, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "NGINX before 1.17.7, with certain error_page configurations, allows HTTP request smuggling, as demoà
+CVE-2018-15919
+174.138.55.125
+22
+28/8/2018, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "Remotely observable behaviour in auth-gss2.c in OpenSSH through 7.8 could be used by remote attackeà
+CVE-2019-20372
+174.138.55.125
+443
+9/1/2020, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "NGINX before 1.17.7, with certain error_page configurations, allows HTTP request smuggling, as demoà
+CVE-2019-6111
+174.138.55.125
+22
+31/1/2019, 0:00:00
+31/3/2026, 5:57:53
+Descripci≤n de vulnerabilidad: "An issue was discovered in OpenSSH 7.9. Due to the scp implementation being derived from 1983 rcp, à
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+22 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no r
+...(truncated)
+
+=== PAGE 23 (2186 chars) ===
+100 INGENIER═A SOCIAL
+El m≤dulo Ingenierφa Social de SecurityScorecard se utiliza para determinar la susceptibilidad potencial de una 
+organizaci≤n a un ataque de ingenierφa social dirigido. El m≤dulo se nutre de datos de redes sociales y filtraciones de datos 
+p·blicas, y combina mΘtodos de anßlisis patentados. La puntuaci≤n de Ingenierφa social es un indicador informativo 
+calculado en funci≤n de la cantidad de indicadores que aparezcan en los sensores de recolecci≤n de SecurityScorecard.
+GRAVEDAD ALTA
+No hay Problemas de gravedad alta para Social
+Engineering
+GRAVEDAD MEDIA
+No hay Problemas de gravedad media para
+Social Engineering
+GRAVEDAD BAJA
+No hay Problemas de gravedad baja para Social
+Engineering
+No se encontr≤ ning·n problema
+con la tecnologφa de
+Informe detallado de confianzaingenieros.com - Preparado el 28/4/26
+|
+23 de 24
+Los anßlisis relacionados con la seguridad, incluidas las calificaciones y las declaraciones en el Contenido de este documento son declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, y no declaraciones sobre hechos
+actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, recomendaciones con respecto a la decisi≤n de hacer negocios con cualquier entidad, endosos de la exactitud de cualquiera de los datos o conclusiones o intentos de evaluar o responder
+independientemente por las medidas de seguridad de cualquier entidad. SECURITYSCORECARD Y SUS ENTIDADES RENUNCIAN A CUALQUIER Y TODAS LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUYENDO, PERO NO EST┴N LIMITADAS A, (1) CUALQUIER GARANT═A
+DE COMERCIABILIDAD O IDONEIDAD PARA UN PARTICULAR PROP╙SITO O PARTICULAR DE LA PARTICIPACI╙N DE COMPROMISO DE PARTICULARES Y DE LAS COMUNICACIONES: ERRORES Y DEFECTOS DEL SOFTWARE, (4) QUE EL FUNCIONAMIENTO DEL
+CONTENIDO SER┴ ININTERRUMPIDO Y (5) QUE EL CONTENIDO FUNCIONAR┴ CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE.Los puntos de vista y opiniones expresadas en cualquier comentario del Scorecard de esta empresa corresponden a sus autores
+y no reflejan la postura ni los puntos de vista de SecurityScorecard ni de ninguna otra entidad.
+
+
+=== PAGE 24 (6224 chars) ===
+Ning·n contenido (incluidos datos, calificaciones, informes, software u otra aplicaci≤n o resultado de los mismos) ya sea 
+en todo o en parte (en su conjunto, el Contenido) puede modificarse, someterse a ingenierφa inversa, reproducirse o 
+distribuirse de ninguna forma ni por ning·n medio, ni almacenarse en una base de datos o sistema de recuperaci≤n, sin el 
+permiso previo por escrito de SecurityScorecard, Inc. (SSC). El Contenido no se utilizarß para ning·n prop≤sito ilegal o no 
+autorizado.
+Ni SSC ni ning·n tercero, sus directores, ejecutivos, accionistas, empleados, clientes y agentes (en su conjunto, las Partes 
+de SSC) garantizan la exactitud, integridad, oportunidad o disponibilidad del Contenido. Las Partes de SSC no son 
+responsables de ning·n error u omisi≤n (negligente o de otro tipo), independientemente de la causa, ni de los resultados 
+obtenidos del uso del Contenido. El Contenido se proporciona ôtal cualö. LAS PARTES DE SECURITYSCORECARD 
+RENUNCIAN A TODAS Y CADA UNA DE LAS GARANT═AS EXPRESAS O IMPL═CITAS, INCLUIDAS, ENTRE OTRAS, (1) 
+GARANT═AS DE COMERCIABILIDAD O IDONEIDAD PARA UN FIN O USO PARTICULAR, (2) GARANT═AS DE PRECISI╙N, 
+RESULTADOS, OPORTUNIDAD E INTEGRIDAD, (3) GARANT═AS DE AUSENCIA DE ERRORES O DEFECTOS DE SOFTWARE 
+(4) GARANT═AS DE FUNCIONAMIENTO ININTERRUMPIDO DEL CONTENIDO Y (5) GARANT═AS DE FUNCIONAMIENTO DEL 
+CONTENIDO CON CUALQUIER CONFIGURACI╙N DE SOFTWARE O HARDWARE. En ning·n caso las Partes de SSC serßn 
+responsables ante ninguna de las partes por ning·n da±o directo, indirecto, incidental, ejemplar, compensatorio, punitivo, 
+especial o consecuente, ni de los costes, gastos, honorarios legales o pΘrdidas (incluidos, sin limitaci≤n, pΘrdida de 
+beneficios o lucro cesante y costes o pΘrdidas de oportunidad causados por negligencia) en relaci≤n con cualquier uso 
+del Contenido, incluso si se les informa de la posibilidad de tales da±os.
+ LOS USUARIOS DEL CONTENIDO DEBEN HACER TODOS LOS ESFUERZOS RAZONABLES PARA MITIGAR CUALQUIER 
+P╔RDIDA O DA╤O DE CUALQUIER TIPO (Y POR CUALQUIER CAUSA) Y NADA DE LO QUE FIGURE EN EL PRESENTE 
+DOCUMENTO SE CONSIDERAR┴ QUE EXIME O ANULA EL DEBER DE LOS USUARIOS DE MITIGAR CUALQUIER P╔RDIDA O 
+DA╤O.
+EN CUALQUIER CASO, EN LA MEDIDA PERMITIDA POR LA LEY, LA RESPONSABILIDAD AGREGADA DE LAS PARTES DE 
+SSC RELACIONADA POR CUALQUIER RAZ╙N CON EL ACCESO O EL USO DEL CONTENIDO NO SUPERAR┴ LA CANTIDAD 
+MAYOR ENTRE (A) EL IMPORTE TOTAL QUE EL USUARIO HAYA PAGADO A SSC POR LOS SERVICIOS PRESTADOS 
+DURANTE LOS 12 MESES INMEDIATAMENTE ANTERIORES AL EVENTO QUE DA LUGAR A LA RESPONSABILIDAD, Y (B) 
+100áUSD.
+ Los anßlisis relacionados con la seguridad, incluidas las calificaciones, y las declaraciones que figuren en el Contenido son 
+declaraciones de opini≤n sobre los riesgos de seguridad relativos futuros de las entidades en la fecha en que se expresan, 
+y no declaraciones de hechos actuales o hist≤ricos en cuanto a la seguridad de las transacciones con cualquier entidad, ni 
+recomendaciones sobr
+...(truncated)
+

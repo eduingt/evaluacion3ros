@@ -1,0 +1,225 @@
+{
+  "id": "AA2PhishTestOnly",
+  "name": "O365 Phishing Triage - SOLO ANALISIS (test dummy)",
+  "nodes": [
+    {
+      "id": "d120bd2a-3ff7-47db-b787-c76963b91ddc",
+      "name": "Correo dummy (prueba)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {
+        "manualTriggerEvent": "automatic"
+      },
+      "position": [
+        0,
+        260
+      ],
+      "credentials": {}
+    },
+    {
+      "id": "cc778b0c-b1bb-449f-9ff1-d4d2cf61b2c7",
+      "name": "Extraer señales",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all()) {\n  const json = item.json || {};\n  const binary = item.binary || {};\n  const attachments = [];\n  for (const key of Object.keys(binary)) {\n    if (key === 'mime') continue;\n    const b = binary[key];\n    if (b && b.fileName) attachments.push({ name: b.fileName, mimeType: b.mimeType || 'unknown', size: b.fileSize || 0 });\n  }\n  let bodyText = '';\n  try {\n    const bodyRaw = (json.body && json.body.content) || json.bodyPreview || '';\n    bodyText = (typeof bodyRaw === 'string') ? bodyRaw.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\\s+/g, ' ').trim() : '';\n  } catch (e) { bodyText = ''; }\n  const fromAddr = (json.from && json.from.emailAddress) ? json.from.emailAddress.address : '';\n  const fromName = (json.from && json.from.emailAddress && json.from.emailAddress.name) ? json.from.emailAddress.name : '';\n  const toAddresses = (json.toRecipients || []).map(r => (r.emailAddress && r.emailAddress.address) || '').filter(Boolean).join('; ');\n  out.push({ json: { id: json.id, internetMessageId: json.internetMessageId, subject: json.subject, fromName, fromEmail: fromAddr, toAddresses, receivedDateTime: json.receivedDateTime, bodyText: bodyText.slice(0, 6000), attachments } });\n}\nreturn out;"
+      },
+      "position": [
+        280,
+        260
+      ],
+      "credentials": {}
+    },
+    {
+      "id": "4b6a6166-9391-489d-8910-c4e59b369eb3",
+      "name": "Ollama - Clasificar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const out = [];\nconst model = process.env.N8N_OLLAMA_MODEL || 'qwen3.5:latest';\nconst ollamaUrl = process.env.N8N_OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';\nconst systemPrompt = 'Eres un analista senior de ciberseguridad experto en email. Clasifica el correo y devuelve SOLO un JSON con este esquema exacto: {\"verdict\":\"malicious|phishing|spam|benign\",\"confidence\":0-100,\"risk_level\":\"low|medium|high|critical\",\"summary\":\"resumen en espanol de 1-2 frases\",\"reasons\":[\"hallazgo1\",\"hallazgo2\"]}. Evalua suplantacion del remitente/dominio, urgimiento y presion, peticiones de pagos/claves/credenciales, enlaces sospechosos, adjuntos con doble extension, Reply-To distinto al From, autenticacion SPF/DKIM/DMARC de cabeceras. No marques falsos positivos sin evidencia concreta.';\nfor (const item of $input.all()) {\n  const d = item.json;\n  const attachBlock = ((d.attachments || []).map(a => '  - ' + a.name + ' (' + a.mimeType + ', ' + (a.size || 0) + ' B)')).join('\\n') || '  (sin adjuntos)';\n  const userContent = ['SUBJECT: ' + (d.subject || ''), 'FROM: ' + (d.fromName || '') + (d.fromEmail ? ' <' + d.fromEmail + '>' : ''), 'TO: ' + (d.toAddresses || ''), 'RECEIVED: ' + (d.receivedDateTime || ''), '', 'BODY:', (d.bodyText || '').slice(0, 5000), '', 'ATTACHMENTS:', attachBlock].join('\\n');\n  let parsed = null, raw = '';\n  try {\n    const payload = { model: model, format: 'json', stream: false, think: false, options: { temperature: 0, num_predict: 400 }, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }] };\n    const resp = await this.helpers.httpRequest({ method: 'POST', url: ollamaUrl, json: true, headers: { 'Content-Type': 'application/json' }, body: payload });\n    raw = resp && resp.message ? resp.message.content : '';\n    const s = raw.indexOf('{'), e = raw.lastIndexOf('}');\n    if (s >= 0 && e > s) parsed = JSON.parse(raw.slice(s, e + 1));\n  } catch (err) { parsed = { verdict: 'error', confidence: 0, risk_level: 'unknown', summary: 'Error de Ollama: ' + (err.message || err), reasons: [] }; }\n  const verdict = String((parsed && parsed.verdict) || 'unknown').toLowerCase();\n  const risk = String((parsed && parsed.risk_level) || 'unknown').toLowerCase();\n  const confidence = Number((parsed && parsed.confidence) || 0);\n  const isThreat = ['phishing', 'malicious'].includes(verdict) || ['high', 'critical'].includes(risk);\n  const reasons = (parsed && Array.isArray(parsed.reasons) ? parsed.reasons : []).map(String);\n  const summary = (parsed && parsed.summary) || 'Sin resultado';\n  out.push({ json: { ...d, verdict, risk_level: risk, confidence, summary, reasons, isThreat } });\n}\nreturn out;"
+      },
+      "position": [
+        560,
+        260
+      ],
+      "credentials": {}
+    },
+    {
+      "id": "7f224249-0242-439a-a2ab-47cdcfcec7eb",
+      "name": "Memoria por remitente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const data = $getWorkflowStaticData('global');\ndata.threads = data.threads || {};\nconst out = [];\nfor (const item of $input.all()) {\n  const d = { ...item.json };\n  const fromKey = String(d.fromEmail || 'none').toLowerCase();\n  const list = data.threads[fromKey] || [];\n  d.thread = list.slice(-8).reverse().map(t => '[' + t.verdict + '] ' + t.summary).join('\\n');\n  list.push({ at: new Date().toISOString(), verdict: d.verdict, summary: d.summary });\n  if (list.length > 20) list.splice(0, list.length - 20);\n  data.threads[fromKey] = list;\n  out.push({ json: d });\n}\nreturn out;"
+      },
+      "position": [
+        840,
+        260
+      ],
+      "credentials": {}
+    },
+    {
+      "id": "146a1fa2-fd59-43f3-ab0a-70dd2ac88099",
+      "name": "AI Agent (veredicto)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "parameters": {
+        "promptType": "define",
+        "text": "Recibes un correo ya analizado (json: verdict, risk_level, confidence, summary, reasons, subject, fromEmail, bodyText, isThreat, thread). Usa el verdict como fuente de verdad y thread para contexto. Redacta el veredicto final en espanol, claro y accionable. Si esThreat, alerta de no abrir enlaces/adjuntos y notificar a TI. Responde unicamente con el cuerpo del veredicto.",
+        "options": {}
+      },
+      "position": [
+        1120,
+        260
+      ],
+      "credentials": {}
+    },
+    {
+      "id": "f941e921-5bd7-496c-982b-5c738ff87ed4",
+      "name": "Ollama Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "parameters": {
+        "model": "qwen3.5:latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "position": [
+        1120,
+        60
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "FaHwUqIrefiqYEA6",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "id": "e73f6062-ba52-40e4-af43-9abbc67f763e",
+      "name": "Salida de prueba",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        1400,
+        260
+      ],
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "Correo dummy (prueba)": {
+      "main": [
+        [
+          {
+            "node": "Extraer señales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer señales": {
+      "main": [
+        [
+          {
+            "node": "Ollama - Clasificar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama - Clasificar": {
+      "main": [
+        [
+          {
+            "node": "Memoria por remitente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memoria por remitente": {
+      "main": [
+        [
+          {
+            "node": "AI Agent (veredicto)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent (veredicto)": {
+      "main": [
+        [
+          {
+            "node": "Salida de prueba",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent (veredicto)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Correo dummy (prueba)": [
+      {
+        "json": {
+          "id": "AQMkADAwATY3MA0BYmFjMDJiOGQtYzJhMi00YWI2LThiZGYtMjE5ZTk4OThlMzA2LURAAAIbG92ZQAAgQ",
+          "internetMessageId": "<A4B2C3D4-E5F6-7890-AB12-CD34EF567890@mail.bancoseguro-verify.com>",
+          "subject": "URGENTE: Verificacion de seguridad de su cuenta bancaria",
+          "from": {
+            "emailAddress": {
+              "name": "Banco Seguro - Alertas",
+              "address": "alertas@bancoseguro-verify.com"
+            }
+          },
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "name": "Juan Perez",
+                "address": "juan.perez@empresa.com"
+              }
+            }
+          ],
+          "receivedDateTime": "2026-08-06T10:05:23Z",
+          "bodyPreview": "Detectamos un inicio de sesion sospechoso. Verifique su cuenta en las proximas 2 horas o sera suspendida.",
+          "body": {
+            "contentType": "html",
+            "content": "<html><body><p>Estimado cliente,</p><p><b>Detectamos un inicio de sesion sospechoso</b> desde una ubicacion desconocida.</p><p>Si no es usted, <a href=\"http://bancoseguro-verify.com/update/login/\">verifique su cuenta aqui</a> antes de <b>2 horas</b> o quedara suspendida.</p><p>Adjunto encontrara su estado de cuenta. Descargue y complete el formulario de seguridad.</p><p>Atentamente,<br/>Area de Seguridad - Banco Seguro</p></body></html>"
+          },
+          "attachments": [
+            {
+              "fileName": "Estado_de_cuenta_ago2026.pdf.exe",
+              "mimeType": "application/x-msdownload",
+              "fileSize": 148000,
+              "contentId": "FA1BC2D3-E4F5-6789-ABCD-EF0123456789"
+            }
+          ],
+          "readStatus": false
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": false
+}

@@ -27,6 +27,7 @@ Informe único ASM + último export OrgASM por dominio:
 from __future__ import annotations
 
 import argparse
+import functools
 import html
 import json
 import os
@@ -36,6 +37,7 @@ import socket
 import ssl
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,10 +47,31 @@ import dns.resolver
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import warnings
+warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWarning)
 import social_osint
 import owasp_agentic
 import log_utils
+import finalrecon_runner
 import external_sources
+import subdomain_brute
+import port_scanner
+import proxy_rotation
+import ip_pivot
+import banner_grab
+import vuln_lookup
+import api_discovery
+import webwaf_detect
+import cloud_storage_scan
+import kumo_integration
+import prism_integration
+import claude_osint_integration
+import strix_integration
+import who_dat_integration
+import nuclei_integration
+import gobuster_integration
 
 TIMEOUT = 12
 USER_AGENT = "ASM-Incocredito-Proveedores/1.0 (+research)"
@@ -192,6 +215,22 @@ class ProviderASM:
     supply_chain_reputation: dict[str, Any] = field(default_factory=lambda: {"dnsbl": [], "urlhaus": []})
     social: dict[str, Any] = field(default_factory=dict)
     external: dict[str, Any] = field(default_factory=dict)
+    finalrecon: dict[str, Any] = field(default_factory=dict)
+    open_ports: list[dict[str, Any]] = field(default_factory=list)
+    brute_subs: list[dict[str, Any]] = field(default_factory=list)
+    pivot_results: list[dict[str, Any]] = field(default_factory=list)
+    banner_grabs: list[dict[str, Any]] = field(default_factory=list)
+    cve_findings: list[dict[str, Any]] = field(default_factory=list)
+    api_endpoints: list[dict[str, Any]] = field(default_factory=list)
+    waf_detection: dict[str, Any] = field(default_factory=dict)
+    cloud_storage: dict[str, Any] = field(default_factory=dict)
+    kumo: dict[str, Any] = field(default_factory=dict)
+    prism: dict[str, Any] = field(default_factory=dict)
+    claude_osint: dict[str, Any] = field(default_factory=dict)
+    strix: dict[str, Any] = field(default_factory=dict)
+    who_dat: dict[str, Any] = field(default_factory=dict)
+    nuclei: dict[str, Any] = field(default_factory=dict)
+    gobuster: dict[str, Any] = field(default_factory=dict)
 
 
 def resolve_dns(domain: str) -> DNSProbe:
@@ -1612,6 +1651,36 @@ def build_matrix_row(p: ProviderASM) -> dict[str, Any]:
         "external_censys_hosts": (p.external.get("censys") or {}).get("hosts") or [],
         "external_theharvester_emails": (p.external.get("theharvester") or {}).get("emails") or [],
         "external_theharvester_subdomains": (p.external.get("theharvester") or {}).get("subdomains") or [],
+        "open_ports": p.open_ports,
+        "open_port_count": len([o for o in p.open_ports if o.get("state") == "open"]),
+        "open_port_list": [o.get("port") for o in p.open_ports if o.get("state") == "open"],
+        "brute_subs": p.brute_subs,
+        "brute_sub_count": len(p.brute_subs),
+        "brute_sub_list": [b.get("fqdn", "") for b in p.brute_subs],
+        "pivot_results": p.pivot_results,
+        "pivot_count": len(p.pivot_results),
+        "pivot_fqdns": list({f for r in p.pivot_results for f in r.get("fqdns_from_crt", [])}),
+        "finalrecon": p.finalrecon,
+        "finalrecon_css_count": len(p.finalrecon.get("css", [])),
+        "finalrecon_js_count": len(p.finalrecon.get("javascripts", [])),
+        "finalrecon_internal_links": len(p.finalrecon.get("internal_urls", [])),
+        "finalrecon_external_links": len(p.finalrecon.get("external_urls", [])),
+        "finalrecon_images": len(p.finalrecon.get("images", [])),
+        "finalrecon_sitemap_count": len(p.finalrecon.get("sitemap", [])),
+        "finalrecon_wayback_total": int((p.finalrecon.get("wayback", {}) or {}).get("stats", {}).get("Total URLs", "0")) or len(((p.finalrecon.get("wayback", {}) or {}).get("js_files") or []) + ((p.finalrecon.get("wayback", {}) or {}).get("api_endpoints") or []) + ((p.finalrecon.get("wayback", {}) or {}).get("juicy_params") or [])),
+        "finalrecon_wayback_js": int((p.finalrecon.get("wayback", {}) or {}).get("stats", {}).get("JS files", "0")) or len((p.finalrecon.get("wayback", {}) or {}).get("js_files") or []),
+        "finalrecon_wayback_api": int((p.finalrecon.get("wayback", {}) or {}).get("stats", {}).get("API endpoints", "0")) or len((p.finalrecon.get("wayback", {}) or {}).get("api_endpoints") or []),
+        "finalrecon_wayback_params": int((p.finalrecon.get("wayback", {}) or {}).get("stats", {}).get("Interesting params", "0")) or len((p.finalrecon.get("wayback", {}) or {}).get("juicy_params") or []),
+        "finalrecon_subdomains": len(p.finalrecon.get("subdomains", [])),
+        "banner_grabs": p.banner_grabs,
+        "banner_count": len(p.banner_grabs),
+        "banner_products": list({b.get("product", "") for b in p.banner_grabs}),
+        "cve_findings": p.cve_findings,
+        "cve_finding_count": len(p.cve_findings),
+        "cve_severity_list": list({c.get("type", "") for c in p.cve_findings}),
+        "api_endpoints": p.api_endpoints,
+        "api_endpoint_count": len(p.api_endpoints),
+        "shadow_api_count": sum(1 for e in p.api_endpoints if e.get("is_shadow")),
     }
     try:
         m["owasp"] = owasp_agentic.evaluate_provider(m)
@@ -2052,6 +2121,304 @@ const N_PATHS = {n_paths};
 </html>"""
 
 
+def _scan_provider(row: dict[str, str], args: argparse.Namespace, test_level: int, now: str) -> ProviderASM:
+    """Scan a single provider domain. Thread-safe."""
+    domain = row["domain"].strip().lower().rstrip(".")
+    log = log_utils.get_logger("asm_scan")
+    log.info("%s (%s)...", row["name"], domain)
+    sess = session_with_retries()
+
+    _tm = {"t": time.time()}
+    def _log_step(name: str) -> None:
+        now = time.time()
+        log.info("  [timing] %-28s %6.1fs", name, now - _tm["t"])
+        _tm["t"] = now
+
+    dns_p = resolve_dns(domain)
+    p80 = PortCheck(False, error="nivel de prueba insuficiente")
+    p443 = PortCheck(False, error="nivel de prueba insuficiente")
+    tls_p = TLSProbe(False, None, None, None, None, None, None, error="nivel de prueba insuficiente")
+    http_p = HTTPProbe(None, None, False, [], {}, None, None, None, None, None, None, None, None, error="nivel de prueba insuficiente")
+    if test_level >= 2:
+        p80 = check_port(domain, 80)
+        p443 = check_port(domain, 443)
+        tls_p = probe_tls(domain) if p443.open else TLSProbe(False, None, None, None, None, None, None, error="443 cerrado / sin TLS")
+        http_p = (
+            probe_https(domain, sess)
+            if p443.open
+            else HTTPProbe(None, None, False, [], {}, None, None, None, None, None, None, None, None, error="443 no disponible")
+        )
+
+    subs: list[dict[str, Any]] = []
+    if not args.no_subdomains and test_level >= 3:
+        subs = enumerate_subdomains(domain)
+
+    paths: list[dict[str, Any]] = []
+    if not args.no_public_paths and test_level >= 2 and p443.open:
+        paths = probe_public_paths(domain, sess)
+
+    crt_subs = query_passive_subdomains(domain)
+    caa_recs = query_caa(domain)
+    mta_sts = query_mta_sts(domain)
+    tls_rpt = query_tls_rpt(domain)
+    bimi = query_bimi(domain)
+    urlhaus = check_urlhaus(domain)
+
+    techs = extract_technologies(http_p.headers)
+    vulns = query_osv(techs) if test_level >= 2 else []
+    patch = check_patching_cadence(techs) if test_level >= 2 else []
+    supply = check_supply_chain(domain, http_p.headers, sess) if test_level >= 2 else []
+    leaks = check_credential_leaks(domain)
+    typos = check_typosquatting(domain)
+    takeover = check_subdomain_takeover(domain, subs) if test_level >= 3 else []
+    csp_header = http_p.headers.get("content-security-policy") or http_p.headers.get("content-security-policy-report-only") if test_level >= 2 else None
+    csp_findings_list = check_csp_security(csp_header) if test_level >= 2 else []
+    cookie_findings_list = check_cookie_security(http_p.headers.get("set-cookie")) if test_level >= 2 else []
+    _log_step("dns+ports+tls+pasivos")
+
+    social_data: dict[str, Any] = {}
+    for net in ("instagram", "tiktok", "twitter", "twitch", "telegram", "github"):
+        uname = row.get(f"social_{net}", "").strip()
+        if uname:
+            try:
+                social_data[net] = social_osint.scan_social(uname, [net]).get(net, {})
+            except Exception:
+                social_data[net] = {"username": uname, "error": "scan_failed"}
+    _log_step("social_osint") if social_data else None
+
+    external_data: dict[str, Any] = {}
+    try:
+        external_data = external_sources.run_all(domain)
+        log.info("External sources OK: whois=%s dnsdumpster=%s shodan=%s censys=%s theharvester=%s",
+            "ok" if "error" not in external_data.get("whois", {}) else external_data["whois"].get("error","fail"),
+            "ok" if "error" not in external_data.get("dnsdumpster", {}) else external_data["dnsdumpster"].get("error","fail"),
+            "ok" if "error" not in external_data.get("shodan", {}) else external_data["shodan"].get("error","fail"),
+            "ok" if "error" not in external_data.get("censys", {}) else external_data["censys"].get("error","fail"),
+            "ok" if "error" not in external_data.get("theharvester", {}) else external_data["theharvester"].get("error","fail"),
+        )
+    except Exception as exc:
+        log.warning("External sources error: %s", exc)
+    _log_step("external_sources")
+
+    finalrecon_data: dict[str, Any] = {}
+    if test_level >= 3:
+        try:
+            finalrecon_data = finalrecon_runner.run_all(domain)
+            fr_status = "ok" if "error" not in finalrecon_data else finalrecon_data.get("error", "fail")
+            log.info("FinalRecon: %s", fr_status)
+        except Exception as exc:
+            log.warning("FinalRecon error: %s", exc)
+    _log_step("finalrecon")
+
+    open_ports_data: list[dict[str, Any]] = []
+    if test_level >= 3:
+        try:
+            all_ips = list(dns_p.ipv4) + list(dns_p.ipv6)
+            if all_ips:
+                open_ports_data = port_scanner.scan_ports(all_ips[0], max_workers=300, timeout=1.5)
+                if len(all_ips) > 1:
+                    for extra_ip in all_ips[1:]:
+                        open_ports_data.extend(port_scanner.scan_ports(extra_ip, max_workers=300, timeout=1.5))
+                log.info("Port scan: %d open ports found", len(open_ports_data))
+        except Exception as exc:
+            log.warning("Port scan error: %s", exc)
+    _log_step("port_scan")
+
+    brute_subs_data: list[dict[str, Any]] = []
+    if test_level >= 3:
+        try:
+            brute_subs_data = subdomain_brute.brute_subdomains(domain, max_workers=100, timeout=60)
+            log.info("Brute subs: %d found", len(brute_subs_data))
+        except Exception as exc:
+            log.warning("Brute subs error: %s", exc)
+    _log_step("brute_subs")
+
+    pivot_data: list[dict[str, Any]] = []
+    if test_level >= 4:
+        try:
+            ips_to_pivot = list(dns_p.ipv4) + list(dns_p.ipv6)
+            if ips_to_pivot:
+                pivot_data = ip_pivot.pivot_ips(ips_to_pivot[:3])
+                log.info("IP pivot: %d results", len(pivot_data))
+        except Exception as exc:
+            log.warning("IP pivot error: %s", exc)
+    _log_step("ip_pivot")
+
+    banner_data: list[dict[str, Any]] = []
+    cve_data: list[dict[str, Any]] = []
+    if test_level >= 4:
+        try:
+            if open_ports_data:
+                first_ip = list(dns_p.ipv4)[0] if dns_p.ipv4 else None
+                if first_ip:
+                    banner_data = banner_grab.grab_banners(first_ip, open_ports_data)
+                    log.info("Banner grab: %d banners collected", len(banner_data))
+                    if banner_data:
+                        cve_data = vuln_lookup.lookup_vulnerabilities(banner_data)
+                        log.info("CVE lookup: %d matches found", len(cve_data))
+        except Exception as exc:
+            log.warning("Banner/CVE error: %s", exc)
+    _log_step("banner+cve")
+
+    api_data: list[dict[str, Any]] = []
+    if test_level >= 3:
+        try:
+            if http_p and http_p.status_code and 200 <= http_p.status_code < 500:
+                api_data = api_discovery.discover_api_endpoints(domain)
+                log.info("API discovery: %d endpoints probed", len(api_data))
+        except Exception as exc:
+            log.warning("API discovery error: %s", exc)
+    _log_step("api_discovery")
+
+    waf_data: dict[str, Any] = {}
+    cloud_data: dict[str, Any] = {}
+    if test_level >= 2:
+        try:
+            cnames: list[str] = []
+            try:
+                cnames = [str(r) for r in dns.resolver.resolve(domain, "CNAME", lifetime=8)]
+            except Exception:
+                pass
+            if http_p and http_p.headers:
+                waf_data = webwaf_detect.detect_waf(domain, http_p.status_code, http_p.headers, cnames)
+                if waf_data.get("detected"):
+                    log.info("WAF detectado en %s: %s", domain, ",".join(waf_data["waf"]))
+        except Exception as exc:
+            log.warning("WAF detection error: %s", exc)
+        try:
+            cloud_data = cloud_storage_scan.scan_cloud_storage(domain, html=None, cnames=cnames)
+            if cloud_data.get("publicos"):
+                log.info("Cloud storage: %d bucket(s) publico(s) en %s", len(cloud_data["publicos"]), domain)
+        except Exception as exc:
+            log.warning("Cloud storage scan error: %s", exc)
+    _log_step("waf+cloud")
+
+    kumo_data: dict[str, Any] = {}
+    try:
+        kumo_data = kumo_integration.run_for_level(domain, test_level)
+        n_ok = sum(1 for k, v in kumo_data.items() if k not in ("domain", "level") and not (v.get("error") if isinstance(v, dict) else False))
+        log.info("KUMO enrichment: %d modulo(s) ok en %s (nivel %d)", n_ok, domain, test_level)
+    except Exception as exc:
+        log.warning("KUMO enrichment error: %s", exc)
+    _log_step("kumo")
+
+    prism_data: dict[str, Any] = {}
+    try:
+        prism_emails = prism_integration._collect_emails(external_data)
+        prism_ips = list(dns_p.ipv4)[:3]
+        prism_org = row.get("name", "").split("(")[0].strip()
+        prism_data = prism_integration.run_for_level(domain, test_level, emails=prism_emails, ips=prism_ips, org_name=prism_org)
+        n_ok = sum(1 for k, v in prism_data.items() if k not in ("domain", "level") and not (v.get("error") if isinstance(v, dict) else False))
+        log.info("Prism enrichment: %d modulo(s) ok en %s (nivel %d)", n_ok, domain, test_level)
+    except Exception as exc:
+        log.warning("Prism enrichment error: %s", exc)
+    _log_step("prism")
+
+    claude_osint_data: dict[str, Any] = {}
+    try:
+        co_emails = prism_emails
+        co_ips = prism_ips
+        co_org = [prism_org]
+        co_spf = (dns_p.spf_record if hasattr(dns_p, "spf_record") else None) or (external_data.get("whois") or {}).get("spf")
+        co_dmarc = getattr(dns_p, "dmarc_record", None) or (external_data.get("whois") or {}).get("dmarc")
+        claude_osint_data = claude_osint_integration.run_for_level(
+            domain, test_level, emails=co_emails, ips=co_ips, org_names=co_org,
+            spf_txt=co_spf, dmarc_txt=co_dmarc)
+        n_ok = sum(1 for k, v in claude_osint_data.items() if k not in ("domain", "level") and not (v.get("error") if isinstance(v, dict) else False))
+        log.info("Claude-OSINT enrichment: %d modulo(s) ok en %s (nivel %d)", n_ok, domain, test_level)
+    except Exception as exc:
+        log.warning("Claude-OSINT enrichment error: %s", exc)
+    _log_step("claude_osint")
+
+    strix_data: dict[str, Any] = {}
+    try:
+        strix_data = strix_integration.run_strix(domain, test_level)
+        strix_status = strix_data.get("status")
+        log.info("Strix enrichment en %s (nivel %d) -> %s", domain, test_level, strix_status)
+    except Exception as exc:
+        strix_data = {"status": "error", "error": str(exc)}
+        log.warning("Strix enrichment error: %s", exc)
+    _log_step("strix")
+
+    who_dat_data: dict[str, Any] = {}
+    try:
+        who_dat_data = who_dat_integration.run_for_level(domain, test_level)
+        n_ok = sum(1 for k, v in who_dat_data.items() if k not in ("domain", "level") and not (v.get("error") if isinstance(v, dict) else False))
+        log.info("who-dat enrichment: %d modulo(s) ok en %s (nivel %d)", n_ok, domain, test_level)
+    except Exception as exc:
+        who_dat_data = {"status": "error", "error": str(exc)}
+        log.warning("who-dat enrichment error: %s", exc)
+    _log_step("who_dat")
+
+    nuclei_data: dict[str, Any] = {}
+    try:
+        nuclei_data = nuclei_integration.run_for_level(domain, test_level)
+        n_ok = 1 if nuclei_data.get("status") == "ok" else 0
+        log.info("Nuclei enrichment: %d modulo(s) ok en %s (nivel %d)", n_ok, domain, test_level)
+    except Exception as exc:
+        nuclei_data = {"status": "error", "error": str(exc)}
+        log.warning("Nuclei enrichment error: %s", exc)
+    _log_step("nuclei")
+
+    gobuster_data: dict[str, Any] = {}
+    try:
+        gobuster_data = gobuster_integration.run_for_level(domain, test_level)
+        g_ok = 1 if gobuster_data.get("status") == "ok" else (0 if gobuster_data.get("status") == "skipped" else 0)
+        log.info("Gobuster enrichment: status=%s en %s (nivel %d)", gobuster_data.get("status"), domain, test_level)
+    except Exception as exc:
+        gobuster_data = {"status": "error", "error": str(exc)}
+        log.warning("Gobuster enrichment error: %s", exc)
+    _log_step("gobuster")
+
+    return ProviderASM(
+        id=row["id"],
+        name=row["name"],
+        domain=domain,
+        dns=dns_p,
+        port_80=p80,
+        port_443=p443,
+        tls=tls_p,
+        https=http_p,
+        scanned_at=now,
+        subdomains=subs,
+        public_paths=paths,
+        crt_subdomains=crt_subs,
+        caa_records=caa_recs,
+        mta_sts=mta_sts,
+        tls_rpt=tls_rpt,
+        bimi=bimi,
+        san_list=tls_p.san_list,
+        urlhaus=urlhaus,
+        vulnerabilities=vulns,
+        credential_leaks=leaks,
+        typosquatting=typos,
+        patching=patch,
+        supply_chain=supply,
+        supply_chain_reputation=check_supply_reputation(supply),
+        social=social_data,
+        external=external_data,
+        finalrecon=finalrecon_data,
+        takeover_risks=takeover,
+        csp_findings=csp_findings_list,
+        cookie_findings=cookie_findings_list,
+        open_ports=open_ports_data,
+        brute_subs=brute_subs_data,
+        pivot_results=pivot_data,
+        banner_grabs=banner_data,
+        cve_findings=cve_data,
+        api_endpoints=api_data,
+        waf_detection=waf_data,
+        cloud_storage=cloud_data,
+        kumo=kumo_data,
+        prism=prism_data,
+        claude_osint=claude_osint_data,
+        strix=strix_data,
+        who_dat=who_dat_data,
+        nuclei=nuclei_data,
+        gobuster=gobuster_data,
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="ASM ligero para lista de dominios.")
     ap.add_argument(
@@ -2085,7 +2452,15 @@ def main() -> int:
         action="store_true",
         help="Omitir sondas HEAD a rutas públicas típicas.",
     )
+    ap.add_argument(
+        "--test-type",
+        choices=["pasivo", "semi-activo", "activo", "invasivo"],
+        default="activo",
+        help="Nivel de pruebas a ejecutar (default: activo). Cada nivel incluye los inferiores.",
+    )
     args = ap.parse_args()
+
+    test_level = {"pasivo": 1, "semi-activo": 2, "activo": 3, "invasivo": 4}[args.test_type]
 
     # Ensure output directories exist
     for p in (args.out_json, args.out_html, args.out_dashboard):
@@ -2094,109 +2469,21 @@ def main() -> int:
 
     log = log_utils.get_logger("asm_scan")
     raw = json.loads(args.providers.read_text(encoding="utf-8"))
-    sess = session_with_retries()
     results: list[ProviderASM] = []
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-    for row in raw:
-        domain = row["domain"].strip().lower().rstrip(".")
-        log.info("%s (%s)...", row['name'], domain)
-        dns_p = resolve_dns(domain)
-        p80 = check_port(domain, 80)
-        p443 = check_port(domain, 443)
-        tls_p = probe_tls(domain) if p443.open else TLSProbe(False, None, None, None, None, None, None, error="443 cerrado / sin TLS")
-        http_p = (
-            probe_https(domain, sess)
-            if p443.open
-            else HTTPProbe(None, None, False, [], {}, None, None, None, None, None, None, None, None, error="443 no disponible")
-        )
-
-        subs: list[dict[str, Any]] = []
-        if not args.no_subdomains:
-            subs = enumerate_subdomains(domain)
-
-        paths: list[dict[str, Any]] = []
-        if not args.no_public_paths and p443.open:
-            paths = probe_public_paths(domain, sess)
-
-        crt_subs = query_passive_subdomains(domain)
-        caa_recs = query_caa(domain)
-        mta_sts = query_mta_sts(domain)
-        tls_rpt = query_tls_rpt(domain)
-        bimi = query_bimi(domain)
-        urlhaus = check_urlhaus(domain)
-
-        techs = extract_technologies(http_p.headers)
-        vulns = query_osv(techs)
-        patch = check_patching_cadence(techs)
-        supply = check_supply_chain(domain, http_p.headers, sess)
-        leaks = check_credential_leaks(domain)
-        typos = check_typosquatting(domain)
-        takeover = check_subdomain_takeover(domain, subs)
-        csp_header = http_p.headers.get("content-security-policy") or http_p.headers.get("content-security-policy-report-only")
-        csp_findings_list = check_csp_security(csp_header)
-        cookie_findings_list = check_cookie_security(http_p.headers.get("set-cookie"))
-
-        social_data: dict[str, Any] = {}
-        for net in ("instagram", "tiktok", "twitter", "twitch", "telegram", "github"):
-            uname = row.get(f"social_{net}", "").strip()
-            if uname:
-                try:
-                    social_data[net] = social_osint.scan_social(uname, [net]).get(net, {})
-                except Exception:
-                    social_data[net] = {"username": uname, "error": "scan_failed"}
-
-        external_data: dict[str, Any] = {}
-        try:
-            external_data = external_sources.run_all(domain)
-            log.info("External sources OK: whois=%s dnsdumpster=%s shodan=%s censys=%s theharvester=%s",
-                "ok" if "error" not in external_data.get("whois", {}) else external_data["whois"].get("error","fail"),
-                "ok" if "error" not in external_data.get("dnsdumpster", {}) else external_data["dnsdumpster"].get("error","fail"),
-                "ok" if "error" not in external_data.get("shodan", {}) else external_data["shodan"].get("error","fail"),
-                "ok" if "error" not in external_data.get("censys", {}) else external_data["censys"].get("error","fail"),
-                "ok" if "error" not in external_data.get("theharvester", {}) else external_data["theharvester"].get("error","fail"),
-            )
-        except Exception as exc:
-            log.warning("External sources error: %s", exc)
-
-        results.append(
-            ProviderASM(
-                id=row["id"],
-                name=row["name"],
-                domain=domain,
-                dns=dns_p,
-                port_80=p80,
-                port_443=p443,
-                tls=tls_p,
-                https=http_p,
-                scanned_at=now,
-                subdomains=subs,
-                public_paths=paths,
-                crt_subdomains=crt_subs,
-                caa_records=caa_recs,
-                mta_sts=mta_sts,
-                tls_rpt=tls_rpt,
-                bimi=bimi,
-                san_list=tls_p.san_list,
-                urlhaus=urlhaus,
-                vulnerabilities=vulns,
-                credential_leaks=leaks,
-                typosquatting=typos,
-                patching=patch,
-                supply_chain=supply,
-                supply_chain_reputation=check_supply_reputation(supply),
-                social=social_data,
-                external=external_data,
-                takeover_risks=takeover,
-                csp_findings=csp_findings_list,
-                cookie_findings=cookie_findings_list,
-            )
-        )
-        time.sleep(0.35)
+    _scan = functools.partial(_scan_provider, args=args, test_level=test_level, now=now)
+    max_w = min(6, len(raw))
+    log.info("Scanning %d domains in parallel (max_workers=%d)...", len(raw), max_w)
+    with ThreadPoolExecutor(max_workers=max_w) as ex:
+        results = list(ex.map(_scan, raw))
+    log.info("All %d domains scanned.", len(results))
 
     matrix = [build_matrix_row(p) for p in results]
     payload = {
         "generated_utc": now,
+        "test_type": args.test_type,
+        "test_level": test_level,
         "providers": [dataclass_to_dict(p) for p in results],
         "matrix": matrix,
     }

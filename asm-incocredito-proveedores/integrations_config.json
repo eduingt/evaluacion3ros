@@ -205,6 +205,28 @@
       "enabled": false,
       "needs_key": false,
       "needs_binary": "theHarvester"
+    },
+    {
+      "id": "greynoise",
+      "name": "GreyNoise",
+      "description": "Contexto de IPs: distingue benign scanner vs malicioso (first-party vs shared)",
+      "category": "external",
+      "enabled": true,
+      "needs_key": true,
+      "key_id": "GREYNOISE_API_KEY",
+      "key_label": "API Key de GreyNoise",
+      "key_placeholder": "Ingrese su API key de GreyNoise (community sin key, enterprise con key)"
+    },
+    {
+      "id": "securitytrails",
+      "name": "SecurityTrails",
+      "description": "Histórico DNS, subdominios y WHOIS history",
+      "category": "external",
+      "enabled": true,
+      "needs_key": true,
+      "key_id": "SECURITYTRAILS_API_KEY",
+      "key_label": "API Key de SecurityTrails",
+      "key_placeholder": "Ingrese su API key de SecurityTrails"
     }
   ]
 }

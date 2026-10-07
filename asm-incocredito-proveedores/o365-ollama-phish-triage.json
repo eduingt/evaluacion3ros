@@ -1,0 +1,168 @@
+{
+  "name": "O365 Email Phishing Triage (Ollama)",
+  "nodes": [
+    {
+      "parameters": {
+        "event": "messageReceived",
+        "output": "raw",
+        "filters": {
+          "readStatus": "both"
+        },
+        "options": {
+          "downloadAttachments": true,
+          "attachmentsPrefix": "attachment_"
+        }
+      },
+      "id": "ec014b36-77fe-43bb-8d99-fdb90f660337",
+      "name": "Correos entrantes (O365)",
+      "type": "n8n-nodes-base.microsoftOutlookTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "",
+          "name": "Microsoft Outlook OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "output": "simple",
+        "options": {
+          "getMimeContent": {
+            "values": {
+              "binaryPropertyName": "mime",
+              "outputFileName": ""
+            }
+          }
+        }
+      },
+      "id": "ccad1f27-a565-4a2e-b0ac-e4ec79729826",
+      "name": "Obtener MIME (headers)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "",
+          "name": "Microsoft Outlook OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all()) {\n  const json = item.json || {};\n  const binary = item.binary || {};\n  const attachments = [];\n  for (const key of Object.keys(binary)) {\n    if (key === 'mime') continue;\n    const b = binary[key];\n    if (b && b.fileName) {\n      attachments.push({ name: b.fileName, mimeType: b.mimeType || 'unknown', size: b.fileSize || 0 });\n    }\n  }\n  let bodyText = '';\n  try {\n    const bodyRaw = (json.body && json.body.content) || json.bodyPreview || '';\n    bodyText = (typeof bodyRaw === 'string')\n      ? bodyRaw.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\\s+/g, ' ').trim()\n      : '';\n  } catch (e) { bodyText = ''; }\n  const headers = [];\n  try {\n    if (binary.mime && binary.mime.data) {\n      const mime = Buffer.from(binary.mime.data, 'base64').toString('utf8');\n      const lines = mime.split(/\\r?\\n/);\n      const h = [];\n      for (const line of lines) {\n        if (line.trim() === '') break;\n        if (line.includes(':')) {\n          const idx = line.indexOf(':');\n          h.push({ name: line.slice(0, idx).trim(), value: line.slice(idx + 1).trim() });\n        }\n      }\n      const want = ['Return-Path', 'From', 'Reply-To', 'Subject', 'Delivered-To', 'Received', 'Authentication-Results', 'X-Originating-IP', 'X-Sender-IP', 'Message-ID', 'X-Spam-Score', 'DKIM-Signature'];\n      for (const n of want) {\n        for (const f of h.filter(x => x.name === n).slice(0, 2)) {\n          headers.push(f.name + ': ' + f.value);\n        }\n      }\n    }\n  } catch (e) { /* cabeceras opcionales */ }\n  const fromAddr = (json.from && json.from.emailAddress) ? json.from.emailAddress.address : '';\n  const fromName = (json.from && json.from.emailAddress && json.from.emailAddress.name) ? json.from.emailAddress.name : '';\n  const toAddresses = (json.toRecipients || []).map(r => (r.emailAddress && r.emailAddress.address) || '').filter(Boolean).join('; ');\n  out.push({ json: {\n    id: json.id,\n    internetMessageId: json.internetMessageId,\n    subject: json.subject,\n    fromName: fromName,\n    fromEmail: fromAddr,\n    toAddresses: toAddresses,\n    receivedDateTime: json.receivedDateTime,\n    bodyText: bodyText.slice(0, 6000),\n    headers: headers,\n    attachments: attachments\n  }});\n}\nreturn out;"
+      },
+      "id": "15701de2-e8d0-4384-bbbc-e816951bbc44",
+      "name": "Extraer señales (cuerpo/cabeceras/adjuntos)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nconst model = process.env.N8N_OLLAMA_MODEL || 'qwen3.5:latest';\nconst ollamaUrl = process.env.N8N_OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';\nconst systemPrompt = 'Eres un analista senior de ciberseguridad experto en email. Clasifica el correo y devuelve SOLO un JSON con este esquema exacto: {\"verdict\":\"malicious|phishing|spam|benign\",\"confidence\":0-100,\"risk_level\":\"low|medium|high|critical\",\"summary\":\"resumen en espanol de 1-2 frases\",\"reasons\":[\"hallazgo1\",\"hallazgo2\"]}. Evalua: suplantacion del remitente/dominio, urgimiento y presion, peticiones de pagos/claves/credenciales, enlaces sospechosos, adjuntos con doble extension, Reply-To distinto al From, autenticacion SPF/DKIM/DMARC de las cabeceras. No marques falsos positivos sin evidencia concreta.';\nfor (const item of $input.all()) {\n  const d = item.json;\n  const headerBlock = (d.headers || []).join('\\n');\n  const attachBlock = ((d.attachments || []).map(a => '  - ' + a.name + ' (' + a.mimeType + ', ' + (a.size || 0) + ' B)')).join('\\n') || '  (sin adjuntos)';\n  const userContent = ['SUBJECT: ' + (d.subject || ''), 'FROM: ' + (d.fromName || '') + (d.fromEmail ? ' <' + d.fromEmail + '>' : ''), 'TO: ' + (d.toAddresses || ''), 'RECEIVED: ' + (d.receivedDateTime || ''), '', 'HEADERS:', headerBlock || '  (no disponible)', '', 'BODY:', (d.bodyText || '').slice(0, 5000), '', 'ATTACHMENTS:', attachBlock].join('\\n');\n  let parsed = null;\n  let raw = '';\n  try {\n    const payload = { model: model, format: 'json', stream: false, think: false, options: { temperature: 0, num_predict: 400 }, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }] };\n    const resp = await this.helpers.httpRequest({ method: 'POST', url: ollamaUrl, json: true, headers: { 'Content-Type': 'application/json' }, body: payload });\n    raw = resp && resp.message ? resp.message.content : '';\n    const s = raw.indexOf('{');\n    const e = raw.lastIndexOf('}');\n    if (s >= 0 && e > s) parsed = JSON.parse(raw.slice(s, e + 1));\n  } catch (err) {\n    parsed = { verdict: 'error', confidence: 0, risk_level: 'unknown', summary: 'Error de Ollama: ' + (err.message || err), reasons: [] };\n  }\n  const verdict = String((parsed && parsed.verdict) || 'unknown').toLowerCase();\n  const risk = String((parsed && parsed.risk_level) || 'unknown').toLowerCase();\n  const confidence = Number((parsed && parsed.confidence) || 0);\n  const isThreat = ['phishing', 'malicious'].includes(verdict) || ['high', 'critical'].includes(risk);\n  const reasons = (parsed && Array.isArray(parsed.reasons) ? parsed.reasons : []).map(String);\n  const summary = (parsed && parsed.summary) || 'Sin resultado';\n  const attachInfo = ((d.attachments || []).map(a => a.name)).join(', ') || 'ninguno';\n  const replyTo = (d.toAddresses || d.fromEmail || '').split(';').map(s => s.trim()).filter(Boolean).join(',');\n  const replySubject = 'RE: [' + verdict.toUpperCase() + '] Analisis - ' + (d.subject || 'correo');\n  const lines = [];\n  lines.push('Analisis automatico de seguridad del correo recibido.');\n  lines.push('');\n  lines.push('Veredicto: ' + verdict.toUpperCase());\n  lines.push('Riesgo: ' + risk + '  |  Confianza: ' + confidence + '%');\n  lines.push('');\n  lines.push('Resumen: ' + summary);\n  if (reasons.length) { lines.push(''); lines.push('Motivos:'); for (const r of reasons) lines.push(' - ' + r); }\n  lines.push('');\n  lines.push('Remitente: ' + (d.fromName || '') + (d.fromEmail ? ' <' + d.fromEmail + '>' : ''));\n  lines.push('Destinatario(s): ' + d.toAddresses);\n  lines.push('Adjuntos: ' + attachInfo);\n  lines.push('');\n  if (isThreat) {\n    lines.push('ATENCION: se detecto una posible amenaza. NO abra enlaces ni adjuntos. Notifique a su equipo de TI y elimine el correo.');\n  } else {\n    lines.push('No se detectaron senales claras de amenaza. Proceda con normalidad, manteniendo su personal.');\n  }\n  out.push({ json: { ...d, verdict: verdict, risk_level: risk, confidence: confidence, summary: summary, reasons: reasons, isThreat: isThreat, rawResult: raw.slice(0, 1500), replyTo: replyTo, replySubject: replySubject, replyBody: lines.join('\\n') } });\n}\nreturn out;"
+      },
+      "id": "62cd34ef-7bc5-44c0-8348-ab4665a0affa",
+      "name": "Ollama - Clasificar y veredicto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "toRecipients": "={{ $json.replyTo }}",
+        "subject": "={{ $json.replySubject }}",
+        "bodyContent": "={{ $json.replyBody }}",
+        "additionalFields": {
+          "bodyContentType": "Text",
+          "saveToSentItems": true
+        }
+      },
+      "id": "6b0cfda5-7cbc-45a4-9cee-b7a64f45fb26",
+      "name": "Enviar acuse (veredicto)",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ],
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "",
+          "name": "Microsoft Outlook OAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Correos entrantes (O365)": [
+      {
+        "main": [
+          {
+            "node": "Obtener MIME (headers)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "Obtener MIME (headers)": [
+      {
+        "main": [
+          {
+            "node": "Extraer señales (cuerpo/cabeceras/adjuntos)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "Extraer señales (cuerpo/cabeceras/adjuntos)": [
+      {
+        "main": [
+          {
+            "node": "Ollama - Clasificar y veredicto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "Ollama - Clasificar y veredicto": [
+      {
+        "main": [
+          {
+            "node": "Enviar acuse (veredicto)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

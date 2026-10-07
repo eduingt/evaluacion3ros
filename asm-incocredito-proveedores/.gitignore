@@ -1,0 +1,52 @@
+# ASM-Informe-Proveedores .gitignore
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Playwright
+playwright/.cache/
+
+# Dashboard workspace
+dashboard_workspace/history/
+dashboard_workspace/last/
+
+# Test outputs
+salida_test/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Certs
+*.pem
+*.key
+
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# Logs
+*.log
+logs/
+
+# Misc
+*.zip
+*.bak
+*.tmp
+
+# OpenCTIP (external, not part of this project)
+openCTIP/

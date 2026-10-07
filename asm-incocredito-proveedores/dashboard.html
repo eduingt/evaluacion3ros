@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASM - Panel de escaneo</title>
+  <style>
+:root {
+  --bg: #0a0a0a;
+  --card: #121212;
+  --br: #2a2a2a;
+  --txt: #e0e0e0;
+  --muted: #9e9e9e;
+  --accent: #4fc3f7;
+  --link: #4fc3f7;
+}
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--txt);
+      padding: 28px 16px 48px;
+    }
+    .layout {
+      max-width: 920px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--br);
+      border-radius: 12px;
+      padding: 22px 20px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.2rem; font-weight: 600; }
+    h2 { margin: 0 0 12px; font-size: 1rem; color: var(--link); font-weight: 600; }
+    .sub { color: var(--muted); font-size: 12px; margin-bottom: 16px; line-height: 1.45; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--br);
+      background: #0d1117;
+      color: var(--txt);
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    input:focus { outline: 2px solid #1f6feb; outline-offset: 0; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--br);
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.secondary {
+      background: #21262d;
+      color: var(--txt);
+    }
+    .log {
+      margin-top: 14px;
+      padding: 12px;
+      background: #0d1117;
+      border: 1px solid var(--br);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: ui-monospace, monospace;
+    }
+    .log.err { color: #f85149; }
+    .log.ok { color: #3fb950; }
+    .actions { margin-top: 14px; display: none; flex-direction: column; gap: 8px; }
+    .actions.visible { display: flex; }
+    a.btn {
+      display: inline-block;
+      text-align: center;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #21262d;
+      border: 1px solid var(--br);
+      color: var(--link);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    a.btn:hover { background: #30363d; }
+    .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-group a.btn { font-size: 11px; padding: 7px 10px; }
+    a.mini {
+      display: inline-block;
+      margin-right: 8px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: var(--link);
+    }
+    button.mini.danger {
+      background: transparent;
+      border: 1px solid #f85149;
+      color: #f85149;
+      padding: 2px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button.mini.danger:hover { background: #f85149; color: #fff; }
+    button.config { background: #1f6feb; }
+    button.config:hover { background: #388bfd; }
+    .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.65); z-index:1000; align-items:center; justify-content:center; }
+    .modal.open { display:flex; }
+    .modal-content { background:var(--card); border:1px solid var(--br); border-radius:12px; width:90%; max-width:680px; max-height:85vh; overflow-y:auto; padding:24px; }
+    .modal-content h2 { margin:0 0 16px; }
+    .modal-content .close { float:right; font-size:22px; cursor:pointer; color:var(--muted); }
+    .modal-content .close:hover { color:var(--txt); }
+    .integ-item { padding:12px 0; border-bottom:1px solid var(--br); display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .integ-item:last-child { border-bottom:none; }
+    .integ-item .name { font-weight:600; font-size:14px; flex:1; }
+    .integ-item .desc { font-size:12px; color:var(--muted); width:100%; }
+    .integ-item .badge { font-size:10px; padding:2px 8px; border-radius:4px; text-transform:uppercase; font-weight:600; }
+    .badge.builtin { background:#0d5330; color:#3fb950; }
+    .badge.external { background:#1c3a5f; color:#58a6ff; }
+    .badge.network { background:#5a3e1c; color:#d29922; }
+    .integ-item .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+    .status-dot.on { background:#3fb950; }
+    .status-dot.off { background:#f85149; }
+    .integ-item input[type=text] { width:100%; max-width:260px; padding:6px 8px; border-radius:4px; border:1px solid var(--br); background:#0d1117; color:var(--txt); font-size:12px; }
+    .integ-item .save-btn { padding:4px 10px; border-radius:4px; border:1px solid var(--br); background:var(--accent); color:#fff; font-size:11px; cursor:pointer; }
+    .integ-item .save-btn:hover { background:#2ea043; }
+    .integ-item .key-status { font-size:11px; color:var(--muted); margin-left:6px; }
+    .key-configured { color:#3fb950; }
+    .key-missing { color:#f85149; }
+    .toggle-wrap { display:flex; align-items:center; gap:6px; }
+    .toggle-wrap input[type=checkbox] { accent-color:var(--accent); }
+    table.hist {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    table.hist th, table.hist td {
+      border: 1px solid var(--br);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    table.hist th {
+      background: #0d1117;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+    table.hist td { word-break: break-all; }
+    .muted { color: var(--muted); }
+    .mono { font-family: ui-monospace, monospace; font-size: 11px; }
+
+    /* ===== Topbar superior derecha ===== */
+    .topbar {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      z-index: 900;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .gear-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--br);
+      background: var(--card);
+      color: var(--txt);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,.35);
+    }
+    .gear-btn:hover { border-color: var(--accent); }
+    .gear-btn .gear-ico { font-size: 15px; line-height: 1; }
+    .dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 230px;
+      background: var(--card);
+      border: 1px solid var(--br);
+      border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.4);
+      overflow: hidden;
+      display: none;
+      flex-direction: column;
+      padding: 6px;
+    }
+    .dropdown.open { display: flex; }
+    .d-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      color: var(--txt);
+      font-size: 13px;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+    .d-item:hover { background: rgba(255,255,255,.06); }
+    .d-item .d-ico { width: 18px; text-align: center; color: var(--accent); }
+    .d-item .d-hint { margin-left: auto; font-size: 10px; color: var(--muted); text-transform: uppercase; }
+    .d-sep { height: 1px; background: var(--br); margin: 6px 4px; }
+
+    /* ===== Settings modal con tabs ===== */
+    .cfg-nav {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--br);
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    .cfg-tab {
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--br);
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .cfg-tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .cfg-sec { display: none; }
+    .cfg-sec.on { display: block; }
+    .cfg-field { margin-bottom: 14px; }
+    .cfg-field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .cfg-field .value { font-size: 13px; color: var(--txt); }
+    .theme-opt {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--br);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    .theme-opt.on { border-color: var(--accent); }
+    .theme-opt .swatch {
+      width: 34px; height: 22px; border-radius: 4px; border: 1px solid var(--br); flex-shrink: 0;
+    }
+    .api-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 4px;
+      border-bottom: 1px solid var(--br);
+      font-size: 12px;
+    }
+    .api-row:last-child { border-bottom: none; }
+    .api-row .api-method {
+      width: 56px; flex-shrink: 0; text-align: center;
+      font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 4px;
+      background: #1f6feb; color: #fff; text-transform: uppercase;
+    }
+    .api-row .api-path { font-family: ui-monospace, monospace; color: var(--link); word-break: break-all; }
+
+    /* ===== Tema claro ===== */
+    body[data-cfg-theme="light"] {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --br: #d6dce3;
+      --txt: #16202c;
+      --muted: #6b7684;
+      --accent: #0f4c81;
+      --link: #145c9e;
+    }
+    body[data-cfg-theme="light"] input[type="text"],
+    body[data-cfg-theme="light"] .log,
+    body[data-cfg-theme="light"] table.hist th {
+      background: #f2f5f8;
+      color: var(--txt);
+    }
+    body[data-cfg-theme="light"] .d-item:hover { background: rgba(0,0,0,.05); }
+    body[data-cfg-theme="light"] .gear-btn { box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <button type="button" class="gear-btn" id="btnGear" aria-label="Configuracion">
+      <span class="gear-ico">&#9881;</span>
+      <span id="gearLabel">Configuracion</span>
+      <span style="font-size:10px;color:var(--muted);">&#9662;</span>
+    </button>
+    <div class="dropdown" id="cfgDropdown">
+      <button type="button" class="d-item" data-cfg-sec="users"><span class="d-ico">&#128101;</span> Usuarios <span class="d-hint">2</span></button>
+      <button type="button" class="d-item" data-cfg-sec="apis"><span class="d-ico">&#9883;</span> APIs <span class="d-hint">10</span></button>
+      <button type="button" class="d-item" data-cfg-sec="integrations"><span class="d-ico">&#8679;</span> Integraciones <span class="d-hint">ver</span></button>
+      <button type="button" class="d-item" data-cfg-sec="theme"><span class="d-ico">&#9632;</span> Tema <span class="d-hint">claro/oscuro</span></button>
+      <div class="d-sep"></div>
+      <button type="button" class="d-item" data-cfg-sec="system"><span class="d-ico">&#8505;</span> Sistema <span class="d-hint">info</span></button>
+      <button type="button" class="d-item" id="dRestart"><span class="d-ico">&#8635;</span> Reiniciar servicio <span class="d-hint">--</span></button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="panel">
+       <h1>Evaluación de Postura de Seguridad de Terceros</h1>
+       <p class="sub">Evaluación de postura de seguridad de terceros (ej. www.dominio.com.co). Cada evaluación se guarda en el historial; puedes descargar informes PDF o HTML cuando lo necesites.</p>
+
+<div class="panel" style="margin:0;">
+        <horizontal-option-selector
+          id="testType"
+          label="¿Qué tipo de pruebas deseas hacer?"
+          multiple=false
+          options='[{"value":"pasivo","label":"Pasivo"},{"value":"semi-activo","label":"Semi-activo"},{"value":"activo","label":"Activo"},{"value":"invasivo","label":"Invasivo"}]'
+          selected="pasivo"
+        ></horizontal-option-selector>
+      </div>
+
+<label for="domain">Dominio a escanear</label>
+       <input id="domain" type="text" placeholder="www.dominio.com.co" autocomplete="off" />
+
+      <div class="row">
+        <button type="button" id="btnScan">Ejecutar escaneo</button>
+      </div>
+
+      <div class="row" style="margin-top:12px;align-items:center;">
+        <label for="domainTxt" style="margin:0;">Escaneo por lista TXT</label>
+        <input id="domainTxt" type="file" accept=".txt,text/plain" />
+        <button type="button" class="secondary" id="btnScanTxt">Escanear lista TXT</button>
+      </div>
+      <p class="sub" style="margin-top:6px;">Sube un archivo <code>.txt</code> con un dominio por linea. Lineas con <code>#</code>, <code>;</code> o <code>//</code> se ignoran.</p>
+
+      <div id="log" class="log"></div>
+
+      <div id="actions" class="actions">
+        <span class="muted" style="font-size:12px;">Ultimo escaneo (tambien en tabla abajo):</span>
+        <div class="btn-group">
+          <a class="btn" id="dlPdf" href="#">PDF Generic</a>
+          <a class="btn" id="dlPdfGc" href="/api/download/pdf-grupocibest">PDF grupcibest</a>
+          <a class="btn" id="dlPdfBc" href="/api/download/pdf-bancolombia">PDF bancolombia</a>
+          <a class="btn" id="dlPdfS3" href="/api/download/pdf-scor3bank">PDF scor3bank</a>
+          <a class="btn" id="dlPdfBeta1" href="/api/download/pdf-beta1">PDF BETA1</a>
+          <a class="btn" id="dlPdfB2" href="/api/download/pdf-b2">PDF B2 SCORECARD</a>
+          
+          <a class="btn" id="dlPdfPp" href="/api/download/pdf-ppasivo">PDF Ppasivo</a>
+        </div>
+        <a class="btn" id="dlPpHtml" href="#">HTML Ppasivo</a>
+        <a class="btn" id="dlHtml" href="#" target="_blank">HTML</a>
+      </div>
+    </div>
+
+    <div class="panel">
+       <h2>Historial de Evaluaciones</h2>
+       <p class="sub">Registro de todas las evaluaciones de terceros realizadas (máx. 80 entradas; las más antiguas se eliminan automáticamente).</p>
+      <div class="row" style="margin-bottom:12px;">
+        <button type="button" class="secondary" id="btnRefresh">Actualizar lista</button>
+      </div>
+      <div id="histWrap" class="muted">Cargando...</div>
+    </div>
+  </div>
+
+  <div class="modal" id="settingsModal">
+    <div class="modal-content">
+      <span class="close" id="settingsClose">&times;</span>
+      <h2>Configuracion</h2>
+      <div class="cfg-nav">
+        <button type="button" class="cfg-tab on" data-sec="users">Usuarios</button>
+        <button type="button" class="cfg-tab" data-sec="apis">APIs</button>
+        <button type="button" class="cfg-tab" data-sec="integrations">Integraciones</button>
+        <button type="button" class="cfg-tab" data-sec="theme">Tema</button>
+        <button type="button" class="cfg-tab" data-sec="system">Sistema</button>
+      </div>
+
+      <div class="cfg-sec on" id="cfg-users">
+        <div class="cfg-field"><label>Usuarios del panel</label>
+          <p class="muted" style="font-size:12px;">Interno, sin autenticacion externa. Los permisos de escaneo se gestionan por rol local.</p>
+        </div>
+        <div id="usersList"><p class="muted">Cargando...</p></div>
+      </div>
+
+      <div class="cfg-sec" id="cfg-apis">
+        <div class="cfg-field"><label>Endpoints API disponibles</label>
+          <p class="muted" style="font-size:12px;">Endpoints publicos del panel para automatizar escaneos e integrar con SIEM/AM.</p>
+        </div>
+        <div id="apisList"><p class="muted">Cargando...</p></div>
+      </div>
+
+      <div class="cfg-sec" id="cfg-integrations">
+        <p class="muted" style="font-size:12px;">Fuentes de datos del escaneo ASM. Configura API keys y activa/desactiva cada integracion.</p>
+        <div id="cfgIntegList"><p class="muted">Cargando...</p></div>
+      </div>
+
+      <div class="cfg-sec" id="cfg-theme">
+        <div class="cfg-field"><label>Apariencia</label>
+          <div class="theme-opt on" data-theme="dark"><span class="swatch" style="background:#0a0a0a;"></span> Oscuro (default)</div>
+          <div class="theme-opt" data-theme="light"><span class="swatch" style="background:#f4f6f8;border-color:#c0c8d2;"></span> Claro</div>
+        </div>
+      </div>
+
+      <div class="cfg-sec" id="cfg-system">
+        <div class="cfg-field"><label>Version</label><div class="value" id="sysVersion">ASM Panel v1</div></div>
+        <div class="cfg-field"><label>Servicio</label><div class="value">ASM-Dashboard (NSSM)</div></div>
+        <div class="cfg-field"><label>Entorno</label><div class="value" id="sysPython">Python -</div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const CSS = `
+        :host { display: block; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+        .hos-label { font-size: 12px; color: var(--muted, #9e9e9e); margin-bottom: 8px; letter-spacing: .3px; }
+        .hos-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .hos-opt {
+          position: relative;
+          padding: 9px 16px;
+          border: 1px solid var(--br, #2a2a2a);
+          border-radius: 999px;
+          background: var(--card, #121212);
+          color: var(--txt, #e0e0e0);
+          font-size: 13px;
+          cursor: pointer;
+          user-select: none;
+          transition: background .15s ease, border-color .15s ease, color .15s ease;
+        }
+        .hos-opt:hover { border-color: var(--accent, #4fc3f7); }
+        .hos-opt input {
+          position: absolute;
+          opacity: 0;
+          width: 0;
+          height: 0;
+          pointer-events: none;
+        }
+        .hos-opt[aria-pressed="true"] {
+          background: var(--accent, #4fc3f7);
+          border-color: var(--accent, #4fc3f7);
+          color: #fff;
+          font-weight: 600;
+        }
+        .hos-opt:focus-visible { outline: 2px solid var(--accent, #4fc3f7); outline-offset: 2px; }
+        .hos-dot {
+          display: inline-block;
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          margin-right: 7px;
+          vertical-align: 1px;
+          background: transparent;
+          border: 1.5px solid currentColor;
+          transition: background .15s ease;
+        }
+        .hos-opt[aria-pressed="true"] .hos-dot { background: #fff; }
+      `;
+
+      const TPL = `
+        <style>${CSS}</style>
+        <div class="hos-label"></div>
+        <div class="hos-row" role="group"></div>
+      `;
+
+      class HorizontalOptionSelector extends HTMLElement {
+        static get observedAttributes() { return ["label", "options", "selected", "multiple"]; }
+
+        constructor() {
+          super();
+          this.attachShadow({ mode: "open" });
+          this.shadowRoot.innerHTML = TPL;
+          this._options = [];
+          this._selected = [];
+          this._multiple = false;
+          this._initialized = false;
+        }
+
+        connectedCallback() {
+          this._multiple = this.hasAttribute("multiple") && this.getAttribute("multiple") !== "false";
+          this._render();
+          this.shadowRoot.querySelector(".hos-row").addEventListener("click", (e) => {
+            const pill = e.target.closest(".hos-opt");
+            if (!pill) return;
+            this.toggle(pill.dataset.value);
+          });
+        }
+
+        attributeChangedCallback() {
+          if (this.isConnected) this._render();
+        }
+
+        get value() { return this._multiple ? this._selected.slice() : this._selected[0] ?? ""; }
+        set value(v) {
+          this._selected = this._multiple ? (Array.isArray(v) ? v.slice() : [v]) : [v].filter(Boolean);
+          this._render();
+        }
+        get multiple() { return this._multiple; }
+        set multiple(m) { this._multiple = !!m; this._render(); }
+
+        toggle(val) {
+          if (this._multiple) {
+            this._selected = this._selected.includes(val)
+              ? this._selected.filter((x) => x !== val)
+              : [...this._selected, val];
+          } else {
+            this._selected = [val];
+          }
+          this._render();
+          this.dispatchEvent(new CustomEvent("change", { detail: { value: this.value } }));
+        }
+
+        _parseOptions() {
+          const raw = this.getAttribute("options");
+          if (!raw) { this._options = []; return; }
+          try {
+            const arr = JSON.parse(raw);
+            this._options = arr.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
+          } catch (_) { this._options = []; }
+        }
+
+        _render() {
+          this._parseOptions();
+          this._multiple = this.hasAttribute("multiple") && this.getAttribute("multiple") !== "false";
+          if (!this._initialized) {
+            const selRaw = this.getAttribute("selected") || "";
+            const sel = this._multiple
+              ? selRaw.split(",").map((s) => s.trim()).filter(Boolean)
+              : (selRaw ? [selRaw] : []);
+            if (sel.length) this._selected = sel;
+            this._initialized = true;
+          }
+
+          const labelEl = this.shadowRoot.querySelector(".hos-label");
+          labelEl.textContent = this.getAttribute("label") || "";
+
+          const row = this.shadowRoot.querySelector(".hos-row");
+          row.innerHTML = "";
+          this._options.forEach((o) => {
+            const on = this._selected.includes(o.value);
+            const pill = document.createElement("button");
+            pill.type = "button";
+            pill.className = "hos-opt";
+            pill.dataset.value = o.value;
+            pill.setAttribute("aria-pressed", String(on));
+            pill.innerHTML = `<span class="hos-dot"></span>${this._escape(o.label)}`;
+            row.appendChild(pill);
+          });
+        }
+
+        _escape(s) {
+          const d = document.createElement("div");
+          d.textContent = s;
+          return d.innerHTML;
+        }
+      }
+
+      if (!customElements.get("horizontal-option-selector")) {
+        customElements.define("horizontal-option-selector", HorizontalOptionSelector);
+      }
+    })();
+  </script>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const log = $("log");
+    const actions = $("actions");
+    const histWrap = $("histWrap");
+
+    function setLog(text, cls) {
+      log.textContent = text;
+      log.className = "log" + (cls ? " " + cls : "");
+    }
+
+    async function loadHistory() {
+      histWrap.textContent = "Cargando...";
+      try {
+        const r = await fetch("/api/history", { cache: "no-store" });
+        if (!r.ok) {
+          let detail = r.status + " " + r.statusText;
+          try {
+            const errBody = await r.json();
+            if (errBody && (errBody.detail || errBody.message)) {
+              detail = String(errBody.detail || errBody.message);
+            }
+          } catch (_) { /* ignore */ }
+          histWrap.innerHTML = "<p class='muted' style='color:#f85149'>Error historial: " + escapeHtml(detail) + "</p>";
+          return;
+        }
+        const data = await r.json();
+        const items = data.items || [];
+        if (!items.length) {
+          histWrap.innerHTML = "<p class='muted'>Aun no hay escaneos guardados. Ejecuta uno arriba.</p>";
+          return;
+        }
+        let html = "<table class='hist'><thead><tr><th>Fecha (UTC)</th><th>Dominio</th><th>ID</th><th>Descargas</th><th></th></tr></thead><tbody>";
+        for (const it of items) {
+          const pdf = it.has_pdf ? `<a class='mini' href='${it.pdf_url}'>PDF</a>` : "<span class='muted'>PDF -</span>";
+          const pdfGc = it.has_pdf ? `<a class='mini' href='${it.pdf_url.replace("/pdf","/pdf-grupocibest")}'>GC</a>` : "<span class='muted'>GC -</span>";
+          const pdfBc = it.has_pdf ? `<a class='mini' href='${it.pdf_url.replace("/pdf","/pdf-bancolombia")}'>BC</a>` : "<span class='muted'>BC -</span>";
+          const pdfS3 = it.has_pdf ? `<a class='mini' href='${it.pdf_url.replace("/pdf","/pdf-scor3bank")}'>S3</a>` : "<span class='muted'>S3 -</span>";
+          const pdfB1 = it.has_beta1_pdf ? `<a class='mini' href='${it.pdf_url.replace("/pdf","/pdf-beta1")}'>B1</a>` : "<span class='muted'>B1 -</span>";
+          const pdfB2 = it.has_b2_pdf ? `<a class='mini' href='${it.pdf_url.replace("/pdf","/pdf-b2")}'>B2</a>` : "<span class='muted'>B2 -</span>";
+          const pdfPp = it.has_ppasivo_pdf ? `<a class='mini' href='${it.pdf_url.replace("/pdf","/pdf-ppasivo")}'>PP</a>` : "<span class='muted'>PP -</span>";
+          const htm = it.has_html ? `<a class='mini' href='${it.html_url}' target='_blank'>HTML</a>` : "<span class='muted'>HTML -</span>";
+          const sid = it.scan_id || "";
+          html += "<tr><td>" + escapeHtml(it.created_utc || "") + "</td><td><strong>" + escapeHtml(it.domain || "") + "</strong></td><td class='mono'>" + escapeHtml(sid) + "</td><td>" + pdf + " " + pdfGc + " " + pdfBc + " " + pdfS3 + " " + pdfB1 + " " + pdfB2 + " " + pdfPp + " " + htm + "</td><td><button class='mini danger' data-sid='" + escapeHtml(sid) + "'>Eliminar</button></td></tr>";
+        }
+        html += "</tbody></table>";
+        histWrap.innerHTML = html;
+        histWrap.querySelectorAll("button[data-sid]").forEach(function(btn) {
+          btn.addEventListener("click", async function() {
+            var sid = this.getAttribute("data-sid");
+            if (!confirm("Eliminar escaneo " + sid + "? Esta accion no se puede deshacer.")) return;
+            try {
+              var res = await fetch("/api/history/" + encodeURIComponent(sid) + "/delete", { method: "POST" });
+              if (res.ok) {
+                await loadHistory();
+              } else {
+                alert("Error al eliminar: " + res.status + " " + res.statusText);
+              }
+            } catch (e) {
+              alert("Error de red: " + e);
+            }
+          });
+        });
+      } catch (e) {
+        histWrap.textContent = "Error: " + e;
+      }
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // Topbar / panel de configuracion
+    const gearLabelDefault = "Configuracion";
+
+    function closeDropdown() { $("cfgDropdown").classList.remove("open"); }
+
+    $("btnGear").addEventListener("click", function(e) {
+      e.stopPropagation();
+      $("cfgDropdown").classList.toggle("open");
+    });
+    document.addEventListener("click", function(e) {
+      if (!e.target.closest(".topbar")) closeDropdown();
+    });
+
+    function openSettings(sec) {
+      closeDropdown();
+      showCfgSection(sec || "users");
+      $("settingsModal").classList.add("open");
+    }
+
+    function showCfgSection(sec) {
+      const valid = ["users", "apis", "integrations", "theme", "system"];
+      if (!valid.includes(sec)) sec = "users";
+      document.querySelectorAll(".cfg-tab").forEach(function(t) {
+        t.classList.toggle("on", t.dataset.sec === sec);
+      });
+      document.querySelectorAll(".cfg-sec").forEach(function(s) {
+        s.classList.toggle("on", s.id === "cfg-" + sec);
+      });
+      $("gearLabel").textContent = sec === "integrations" ? "Integraciones" : gearLabelDefault;
+      if (sec === "integrations") loadCfgIntegrations();
+      if (sec === "users") loadUsers();
+      if (sec === "apis") loadApis();
+      if (sec === "system") loadSystem();
+    }
+
+    document.querySelectorAll(".cfg-nav .cfg-tab").forEach(function(t) {
+      t.addEventListener("click", function() { showCfgSection(this.dataset.sec); });
+    });
+    document.querySelectorAll(".dropdown .d-item[data-cfg-sec]").forEach(function(it) {
+      it.addEventListener("click", function() { openSettings(this.dataset.cfgSec); });
+    });
+    $("settingsClose").addEventListener("click", function() { $("settingsModal").classList.remove("open"); });
+    $("settingsModal").addEventListener("click", function(e) { if (e.target === this) { this.classList.remove("open"); } });
+
+    // ---- Usuarios ----
+    const USERS_KEY = "asm_cfg_users";
+    function loadUsers() {
+      const box = $("usersList");
+      const users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+      if (!users.length) {
+        box.innerHTML = '<p class="muted" style="font-size:12px;">Aun no hay usuarios registrados en este panel.</p>';
+        return;
+      }
+      box.innerHTML = users.map(function(u) {
+        return '<div class="api-row"><span class="api-method" style="background:#21262d;">USR</span>' +
+          '<span><strong>' + escapeHtml(u.nombre) + '</strong> <span class="muted">(' + escapeHtml(u.email) + ')</span></span>' +
+          '<span class="d-hint" style="margin-left:auto;">' + escapeHtml(u.rol) + '</span></div>';
+      }).join("");
+    }
+
+    // ---- APIs ----
+    const CFG_APIS = [
+      ["POST", "/api/scan", "Escaneo de un dominio (JSON: domain, test_type)"],
+      ["POST", "/api/scan-batch", "Escaneo de lista TXT / multiples dominios"],
+      ["GET",  "/api/history", "Historial de evaluaciones (JSON)"],
+      ["GET",  "/api/history/{id}/pdf", "PDF TPRA de un escaneo"],
+      ["GET",  "/api/history/{id}/pdf-grupocibest", "PDF grupcibest de un escaneo"],
+      ["GET",  "/api/history/{id}/pdf-bancolombia", "PDF bancolombia de un escaneo"],
+      ["GET",  "/api/history/{id}/pdf-scor3bank", "PDF scor3bank de un escaneo"],
+      ["GET",  "/api/history/{id}/pdf-beta1", "PDF beta1 de un escaneo"],
+      ["GET",  "/api/history/{id}/pdf-b2", "PDF B2 scorecard de un escaneo"],
+      ["GET",  "/api/history/{id}/pdf-ppasivo", "PDF Ppasivo de un escaneo"],
+      ["GET",  "/api/history/{id}/html", "HTML TPRA de un escaneo"],
+      ["GET",  "/api/config", "Estado de integraciones (JSON)"],
+      ["PUT",  "/api/config/{id}", "Guardar API key de una integracion"],
+    ];
+    function loadApis() {
+      $("apisList").innerHTML = CFG_APIS.map(function(a) {
+        const m = a[0];
+        return '<div class="api-row"><span class="api-method">' + m + '</span>' +
+          '<span class="api-path">' + escapeHtml(a[1]) + '</span>' +
+          '<span class="muted" style="font-size:11px;">' + escapeHtml(a[2]) + '</span></div>';
+      }).join("");
+    }
+
+    // ---- Sistema ----
+    function loadSystem() {
+      const v = document.querySelector("meta[name='generator']") ? document.querySelector("meta[name='generator']").content : "ASM Panel v1";
+      $("sysVersion").textContent = v;
+      $("sysPython").textContent = navigator.userAgent;
+    }
+
+    // ---- Integraciones (reusa /api/config pero con boton de apertura del modal) ----
+    async function loadCfgIntegrations() {
+      const box = $("cfgIntegList");
+      box.innerHTML = '<p class="muted">Cargando...</p>';
+      try {
+        const r = await fetch("/api/config", { cache: "no-store" });
+        if (!r.ok) { box.innerHTML = '<p style="color:#f85149">Error: ' + r.status + '</p>'; return; }
+        const data = await r.json();
+        const ints = data.integrations || [];
+        if (!ints.length) { box.innerHTML = '<p class="muted">Sin integraciones configuradas.</p>'; return; }
+        box.innerHTML = ints.map(function(it) {
+          const catClass = it.category || "builtin";
+          const enabled = it.enabled !== false;
+          const dot = enabled ? "status-dot on" : "status-dot off";
+          return '<div class="integ-item"><div class="toggle-wrap"><span class="' + dot + '"></span></div>' +
+            '<div class="name">' + escapeHtml(it.name) + '</div>' +
+            '<span class="badge ' + catClass + '">' + escapeHtml(catClass) + "</span>" +
+            '<div class="desc">' + escapeHtml(it.description) + "</div>" +
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;">' +
+            renderKeyField(it) +
+            "</div></div>";
+        }).join("");
+      } catch (e) {
+        box.innerHTML = '<p style="color:#f85149">Error: ' + escapeHtml(String(e)) + "</p>";
+      }
+    }
+
+    // ---- Polling de jobs de escaneo ----
+    async function pollScanJob(jobId, logFn) {
+      if (!jobId) return null;
+      const started = Date.now();
+      for (;;) {
+        let data;
+        try {
+          const rr = await fetch("/api/scan/" + encodeURIComponent(jobId), { cache: "no-store" });
+          data = await rr.json().catch(() => ({}));
+          if (!rr.ok) { setLog(data.detail || "Job " + rr.status, "err"); return null; }
+        } catch (e) {
+          setLog("Error consultando el job: " + String(e), "err");
+          return null;
+        }
+        if (data.status === "error") {
+          setLog("Error del escaneo: " + (data.error || "desconocido"), "err");
+          return null;
+        }
+        if (data.status === "done" && data.result) {
+          return data.result;
+        }
+        const elapsed = Math.round((Date.now() - started) / 1000);
+        if (logFn) logFn("Procesando... " + elapsed + "s (" + (data.status || "running") + ")");
+        await new Promise((res) => setTimeout(res, 3000));
+      }
+    }
+
+    // ---- Tema ----
+    function applyTheme(t) {
+      localStorage.setItem("asm_cfg_theme", t);
+      document.body.setAttribute("data-cfg-theme", t);
+      document.querySelectorAll(".theme-opt").forEach(function(o) {
+        o.classList.toggle("on", o.dataset.theme === t);
+      });
+    }
+    (function initTheme() {
+      let saved = localStorage.getItem("asm_cfg_theme");
+      if (saved !== "light" && saved !== "dark") saved = "dark";
+      applyTheme(saved);
+    })();
+    document.querySelectorAll(".theme-opt").forEach(function(o) {
+      o.addEventListener("click", function() { applyTheme(this.dataset.theme); });
+    });
+
+    // ---- Reiniciar servicio (accion auxiliar) ----
+    $("dRestart").addEventListener("click", function() {
+      closeDropdown();
+      if (!confirm("Esto reinicia el servicio ASM-Dashboard del servidor.")) return;
+      alert("Reinicia desde PowerShell: sc.exe stop ASM-Dashboard; Start-Sleep 2; sc.exe start ASM-Dashboard");
+    });
+
+    function renderKeyField(it) {
+      const configured = it.key_configured;
+      const statusHtml = '<span class="key-status ' + (configured ? 'key-configured' : 'key-missing') + '">' + (configured ? "configurada" : "no configurada") + "</span>";
+      const id = "key_" + it.id;
+      const placeholder = it.key_placeholder || "API key";
+      const extra = it.key_id2 ? renderSecondKey(it) : "";
+      return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;">' +
+        '<label for="' + id + '" style="font-size:12px;margin:0;">' + escapeHtml(it.key_label || "Key") + ':</label>' +
+        '<input type="text" id="' + id + '" placeholder="' + escapeHtml(placeholder) + '" />' +
+        '<button class="save-btn" data-id="' + escapeHtml(it.id) + '" data-key="' + escapeHtml(it.key_id || "") + '">Guardar</button>' +
+        statusHtml +
+        extra +
+        "</div>";
+    }
+
+    function renderSecondKey(it) {
+      return '<label for="key2_' + it.id + '" style="font-size:12px;margin:0;">' + escapeHtml(it.key_label2 || "Secret") + ':</label>' +
+        '<input type="text" id="key2_' + it.id + '" placeholder="' + escapeHtml(it.key_placeholder2 || "API Secret") + '" />';
+    }
+
+    // Delegate save button clicks
+    document.addEventListener("click", async function(e) {
+      const btn = e.target.closest(".save-btn");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      const keyId = btn.getAttribute("data-key");
+      const keyInput = document.getElementById("key_" + id);
+      const key2Input = document.getElementById("key2_" + id);
+      const key = keyInput ? keyInput.value.trim() : "";
+      const key2 = key2Input ? key2Input.value.trim() : "";
+      if (!key && !key2) { alert("Ingresa al menos un valor."); return; }
+      try {
+        const r = await fetch("/api/config/" + encodeURIComponent(id), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: key, key2: key2 }),
+        });
+        if (r.ok) {
+          if (keyInput) keyInput.value = "";
+          if (key2Input) key2Input.value = "";
+          loadCfgIntegrations();
+        } else {
+          const err = await r.json().catch(() => ({}));
+          alert("Error: " + (err.detail || r.status));
+        }
+      } catch (err) {
+        alert("Error de red: " + err);
+      }
+    });
+
+    $("btnRefresh").addEventListener("click", loadHistory);
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", loadHistory);
+    } else {
+      void loadHistory();
+    }
+
+    $("btnScan").addEventListener("click", async () => {
+      const domain = $("domain").value.trim();
+      if (!domain) {
+        setLog("Escribe un dominio.", "err");
+        actions.classList.remove("visible");
+        return;
+      }
+      const btn = $("btnScan");
+      btn.disabled = true;
+      actions.classList.remove("visible");
+      const testType = $("testType");
+      const selTests = testType ? testType.value : "";
+      setLog("Escaneando en segundo plano (puede tardar varios minutos)... Tipo de prueba: " + (selTests || "no seleccionado"));
+      try {
+        const r = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ domain, test_type: selTests }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          setLog(data.detail || data.message || JSON.stringify(data), "err");
+          return;
+        }
+        setLog("Escaneo en cola (job_id: " + (data.job_id || "?") + ")... esperando " + (data.test_type || "") + " ...", "ok");
+        const res = await pollScanJob(data.job_id, setLog);
+        if (!res) return;
+        setLog((res.log || "OK") + "\n\nDominio: " + (res.domain || "") + "\nscan_id: " + (res.scan_id || ""), "ok");
+        actions.classList.add("visible");
+        $("dlPdf").href = res.pdf_url;
+        $("dlPdfGc").href = res.pdf_grupocibest_url || "/api/download/pdf-grupocibest";
+        $("dlPdfBc").href = res.pdf_bancolombia_url || "/api/download/pdf-bancolombia";
+        $("dlPdfS3").href = res.pdf_scor3bank_url || "/api/download/pdf-scor3bank";
+        $("dlPdfPp").href = res.pdf_ppasivo_url || "/api/download/pdf-ppasivo";
+        $("dlPpHtml").href = res.html_ppasivo_url || "/api/download/html-ppasivo";
+        $("dlHtml").href = res.html_url;
+        await loadHistory();
+      } catch (e) {
+        setLog(String(e), "err");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $("btnScanTxt").addEventListener("click", async () => {
+      const fileInput = $("domainTxt");
+      if (!fileInput.files || !fileInput.files.length) {
+        setLog("Selecciona un archivo .txt primero.", "err");
+        actions.classList.remove("visible");
+        return;
+      }
+      const btn = $("btnScanTxt");
+      btn.disabled = true;
+      actions.classList.remove("visible");
+      const testTypeB = $("testType");
+      const selTestsB = testTypeB ? testTypeB.value : "";
+      setLog("Leyendo lista TXT y escaneando en segundo plano (puede tardar varios minutos)... Tipo de prueba: " + (selTestsB || "no seleccionado"));
+      try {
+        const fd = new FormData();
+        fd.append("file", fileInput.files[0]);
+        fd.append("test_type", selTestsB || "activo");
+        const r = await fetch("/api/scan-batch", { method: "POST", body: fd });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          setLog(data.detail || data.message || JSON.stringify(data), "err");
+          return;
+        }
+        setLog("Lote en cola (job_id: " + (data.job_id || "?") + ", " + (data.scanned || 0) + " dominios)... esperando ...", "ok");
+        const res = await pollScanJob(data.job_id, setLog);
+        if (!res) return;
+        setLog((data.log || "OK") + "\n\nDominio(s): " + (data.domain || "") + "\nscan_id: " + (data.scan_id || ""), "ok");
+        actions.classList.add("visible");
+        $("dlPdf").href = data.pdf_url;
+        $("dlPdfGc").href = data.pdf_grupocibest_url || "/api/download/pdf-grupocibest";
+        $("dlPdfBc").href = data.pdf_bancolombia_url || "/api/download/pdf-bancolombia";
+        $("dlPdfS3").href = data.pdf_scor3bank_url || "/api/download/pdf-scor3bank";
+        $("dlPdfPp").href = data.pdf_ppasivo_url || "/api/download/pdf-ppasivo";
+        $("dlPpHtml").href = data.html_ppasivo_url || "/api/download/html-ppasivo";
+        $("dlHtml").href = data.html_url;
+        await loadHistory();
+      } catch (e) {
+        setLog(String(e), "err");
+      } finally {
+        btn.disabled = false;
+        fileInput.value = "";
+      }
+    });
+  </script>
+</body>
+</html>

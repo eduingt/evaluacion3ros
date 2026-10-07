@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Third-Party Risk Assessment Report — www.incocredito.com.co</title>
+<style>
+:root {
+  --bg:#f4f6f8; --card:#fff; --text:#1a1d21; --muted:#5c6570; --border:#d9dee5;
+  --accent:#8B0000; --good:#0d6e4f; --warn:#8a5b00; --bad:#9b1c1c;
+}
+* { box-sizing: border-box; }
+body { margin:0; font-family: 'Segoe UI', system-ui, sans-serif; background:var(--bg); color:var(--text); line-height:1.45; font-size:14px; }
+.wrap { max-width: 920px; margin: 0 auto; padding: 28px 20px 60px; }
+.cover {
+  background: linear-gradient(135deg, #5c1010 0%, #8B0000 45%, #CC0000 100%);
+  color: #fff; padding: 32px 28px; border-radius: 12px; margin-bottom: 28px;
+  box-shadow: 0 8px 24px rgba(139,0,0,.3);
+}
+.cover h1 { margin: 0 0 8px; font-size: 1.45rem; font-weight: 600; letter-spacing: -0.02em; }
+.cover .tag { display:inline-block; margin-top:12px; padding:4px 10px; background:rgba(255,255,255,.15); border-radius:6px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+.cover p { margin: 10px 0 0; opacity: .92; font-size: 13px; max-width: 52em; }
+.toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 22px; margin-bottom: 24px; }
+.toc h2 { margin: 0 0 12px; font-size: 1rem; color: var(--accent); }
+.toc ol { margin: 0; padding-left: 1.2rem; color: var(--muted); font-size: 13px; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+h2.sec { font-size: 1.05rem; color: var(--accent); border-bottom: 2px solid var(--border); padding-bottom: 6px; margin-top: 32px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+.card h3 { margin: 0 0 8px; font-size: 1rem; }
+.card h4 { margin: 16px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.meta { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.kpi-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.pill { background: #eef2f7; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+.score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
+.score-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+.score-box .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.score-box .val { font-size: 26px; font-weight: 700; margin-top: 6px; color: var(--accent); }
+.score-box.trust .val { color: var(--good); }
+.grade { font-size: 42px; font-weight: 700; color: var(--good); float: right; margin: -8px 0 0 16px; line-height: 1; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+table.data th, table.data td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+table.data th { background: #eef2f7; font-weight: 600; font-size: 11px; text-transform: uppercase; color: var(--muted); }
+table.data .num { text-align: right; }
+table.data .c { text-align: center; }
+.small { font-size: 12px; }
+.muted { color: var(--muted); }
+pre.small { background: #f8fafc; padding: 10px; border-radius: 8px; overflow: auto; max-height: 200px; font-size: 11px; border: 1px solid var(--border); }
+ul.compact { margin: 6px 0; padding-left: 1.2rem; }
+.footnote { font-size: 11px; color: var(--muted); margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); }
+@media print {
+  body { background: #fff; }
+  .cover { box-shadow: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cover">
+    <h1>Third-Party Risk Assessment Report — www.incocredito.com.co</h1>
+    <p>Evaluación ASM del sitio público Incocrédito (host www)</p>
+    <p><strong>Periodo de referencia:</strong> datos ASM · <strong>Última ejecución:</strong> 2026-05-20 06:19:21</p>
+    <p><strong>Fecha de informe:</strong> 2026-05-20 06:22 UTC</p>
+    <span class="tag">EVALUACIÓN DE POSTURA DE SEGURIDAD DE TERCEROS</span>
+  </div>
+
+  <nav class="toc">
+    <h2>Tabla de contenidos</h2>
+    <ol>
+      <li><a href="#resumen">Resumen de evaluación</a></li>
+      <li><a href="#reglas">Hallazgos agregados (reglas simplificadas)</a></li>
+      <li><a href="#puntuaciones">Puntuaciones indicativas</a></li>
+      <li><a href="#matriz">Matriz de controles (ASM)</a></li>
+      <li><a href="#superficie">Superficie de ataque por proveedor</a></li>
+      <li><a href="#puertos">Puertos observados (80 / 443)</a></li>
+      <li><a href="#osint">OSINT pasivo — Certificate Transparency, SAN, CAA, MTA-STS</a></li>
+      <li><a href="#ransomware">CVEs frecuentes en ransomware (referencia)</a></li>
+      <li><a href="#vulns">Hallazgos de vulnerabilidad</a></li>
+    </ol>
+  </nav>
+
+  <h2 class="sec" id="resumen">Third-Party Risk Assessment — Resumen</h2>
+  <div class="card">
+    <p>Este documento resume la postura observada por <strong>Attack Surface Management (ASM)</strong> sobre <strong>1 dominios de proveedores</strong>.
+    Las puntuaciones son <strong>indicativas</strong>, calculadas a partir de cabeceras HTTP, TLS, DNS (SPF/DMARC) y disponibilidad de servicios; no sustituyen un informe de auditoría certificada.</p>
+    <p><strong>Activos analizados:</strong> 1 · <strong>Subdominios (DNS prefijos):</strong> 0 · <strong>Subdominios (crt.sh):</strong> 3 · <strong>443 abierto:</strong> 1/1 · <strong>80 abierto:</strong> 0/1 · <strong>CAA presente:</strong> 0/1 · <strong>MTA-STS:</strong> 0/1</p>
+  </div>
+
+  <h2 class="sec" id="reglas">Hallazgos agregados</h2>
+  <div class="card">
+    <table class="data">
+      <thead><tr><th>Tipo</th><th>Descripción</th><th>Proveedores afectados</th><th>Impacto ref.</th></tr></thead>
+      <tbody><tr><td>ASM / Supply Chain</td><td>Dependencias de terceros detectadas (CSP/scripts)</td><td class='num'>3</td><td class='num'>0.35</td></tr>
+<tr><td>ASM / Phishing</td><td>Posibles dominios typosquatting resolviendo</td><td class='num'>1</td><td class='num'>0.5</td></tr>
+<tr><td>ASM / Email Security</td><td>SPF ausente o dominio sin resolución</td><td class='num'>1</td><td class='num'>0.3</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2 class="sec" id="puntuaciones">Puntuaciones indicativas</h2>
+  <div class="card">
+    <div class="grade">A</div>
+    <p class="muted" style="margin-top:0">Grado orientativo a partir del score medio.</p>
+    <div class="score-grid">
+      <div class="score-box"><div class="lbl">ASM (riesgo normalizado)</div><div class="val">0.0</div><div class="muted small">0 = mejor</div></div>
+      <div class="score-box"><div class="lbl">DRP (filtraciones)</div><div class="val">0.0</div><div class="muted small">No medido aquí</div></div>
+      <div class="score-box"><div class="lbl">CTI</div><div class="val">0.0</div><div class="muted small">No medido aquí</div></div>
+      <div class="score-box trust"><div class="lbl">Security trust (indicativo)</div><div class="val">100.0</div><div class="muted small">/ 100</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p><strong>Score heurístico 0–100 y grado A–F:</strong> cada dominio recibe un puntaje basado en los factores que el escáner puede verificar de forma pasiva. El promedio de todos los dominios determina el grado general. La escala sigue el modelo de SecurityScorecard:</p>
+    <ul class="compact">
+      <li><strong>A</strong> (≥90) — postura excelente, controles sólidos en todos los ejes medibles.</li>
+      <li><strong>B</strong> (75–89) — buena, con oportunidades menores de mejora.</li>
+      <li><strong>C</strong> (60–74) — aceptable, pero con carencias que deben revisarse.</li>
+      <li><strong>D</strong> (45–59) — deficiente, múltiples controles ausentes o mal configurados.</li>
+      <li><strong>E</strong> (30–44) — pobre, riesgo elevado en varios dominios.</li>
+      <li><strong>F</strong> (&lt;30) — crítico, requiere atención inmediata.</li>
+    </ul>
+    <p><strong>Factores evaluados en este informe:</strong></p>
+    <ul class="compact">
+      <li><strong>Configuraciones DNS</strong> — SPF (hard-fail), DMARC (reject/quarantine), DKIM, DNSSEC, DANE/TLSA, registros MX y NS, CAA, MTA-STS, TLS-RPT, BIMI.</li>
+      <li><strong>Certificados SSL/TLS</strong> — versión negociada, TLS 1.3 exclusivo, vigencia, emisor, SAN, serial.</li>
+      <li><strong>Puertos abiertos</strong> — disponibilidad de servicios en 80 (HTTP) y 443 (HTTPS).</li>
+      <li><strong>Cabeceras de seguridad HTTP</strong> — HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Feature-Policy/Permissions-Policy, Expect-CT, X-Permitted-Cross-Domain, Server, X-Powered-By, detección de CDN/WAF (Via, CF-Ray, X-CDN).</li>
+      <li><strong>Superficie de subdominios</strong> — descubrimiento por fuerza bruta DNS prefijos y fuentes OSINT pasivas (crt.sh, BufferOver, ThreatCrowd).</li>
+      <li><strong>Geolocalización de IPs</strong> — país asociado a las direcciones IPv4 del dominio.</li>
+      <li><strong>Reputación de IPs</strong> — consulta a DNSBL (Spamhaus ZEN, Barracuda, SpamCop, SORBS, CBL) para detectar IPs listadas como maliciosas o comprometidas.</li>
+      <li><strong>Malware detectado</strong> — consulta a URLhaus (Abuse.ch) para verificar si el dominio ha sido reportado como distribuidor de malware.</li>
+      <li><strong>Vulnerabilidades expuestas</strong> — detección de tecnologías desde cabeceras HTTP (Server, X-Powered-By) y consulta a la base OSV.dev para identificar CVEs asociados a las versiones detectadas.</li>
+      <li><strong>Fugas de credenciales</strong> — consulta a leak-lookup.com para identificar si el dominio aparece en breaches conocidos (requiere variable de entorno <code>LEAK_API_KEY</code>).</li>
+      <li><strong>Riesgos de phishing / typosquatting</strong> — generación de variantes del dominio (cambio de TLD, caracteres adyacentes, omisiones, prefijos comunes) y verificación DNS para detectar posibles dominios falsos activos.</li>
+      <li><strong>Patching cadence</strong> — consulta a endoflife.date para las tecnologías detectadas en cabeceras (Server, X-Powered-By) y determina si la versión está EOL, próxima a EOL o vigente.</li>
+      <li><strong>Riesgo de terceros y supply chain</strong> — extracción de dominios de terceros desde cabeceras CSP y scripts externos en la página principal, con verificación DNS de resolución.</li>
+    </ul>
+    <p><strong>Factores NO evaluados en esta versión (a desarrollar):</strong></p>
+    <ul class="compact">
+      <li>Análisis de reputación de terceros (DNSBL/URLhaus sobre dependencias).</li>
+      <li>Verificación de STARTTLS en MX (puerto 25).</li>
+      <li>Detección de subdomain takeover.</li>
+      <li>Análisis de CSP bypasses y cookie security.</li>
+    </ul>
+    <p><strong>Matriz de controles (ASM):</strong> cada fila representa un proveedor; cada columna indica la presencia (✓) o ausencia (✗) de un control verificado. La tabla de hallazgos agregados resume cuántos proveedores carecen de cada control y su peso de impacto referencial (0.0–1.0).</p>
+  </div>
+
+  <h2 class="sec" id="matriz">Check item matrix — controles ASM</h2>
+  <div class="card">
+    <table class="data">
+      <thead><tr><th>Proveedor</th><th>Sub</th><th>crt.sh</th><th>HTTPS</th><th>HSTS</th><th>CSP</th><th>SPF/DMARC</th><th>TLS1.3-only</th><th>Versión TLS</th><th>CAA</th><th>MTA-STS</th><th>TLS-RPT</th><th>MX</th><th>NS</th><th>DNSSEC</th><th>DKIM</th><th>DANE</th><th>DNSBL</th><th>URLH</th><th>CVE</th><th>LEAK</th><th>TYPO</th><th>PATCH</th><th>SC</th></tr></thead>
+      <tbody><tr>
+ <td>Incocrédito (www)<div class="muted small">www.incocredito.com.co</div></td>
+ <td class="num">0</td>
+ <td class="num">3</td>
+ <td class="small">200</td>
+ <td class="c">✓</td>
+ <td class="c">✓</td>
+ <td class="small">SPF:missing DMARC:-</td>
+ <td class="c">✗</td>
+ <td class="small">TLSv1.3</td>
+ <td class="c">✗</td>
+ <td class="c">✗</td>
+ <td class="c">✗</td>
+ <td class="num">0</td>
+ <td class="num">0</td>
+ <td class="c">✗</td>
+ <td class="num">0</td>
+ <td class="num">0</td>
+ <td class="c">✓</td>
+ <td class="c">✓</td>
+ <td class="num">0</td>
+ <td class="num">0</td>
+ <td class="num">1</td>
+  <td class="num">0</td>
+  <td class="num">3</td>
+  </tr></tbody>
+    </table>
+  </div>
+
+  <h2 class="sec" id="superficie">External attack surface — por proveedor</h2>
+  
+<section class="card" id="incocredito-www">
+  <h3>Incocrédito (www)</h3>
+  <p class="meta"><strong>Dominio:</strong> <code>www.incocredito.com.co</code> · <strong>IPv4:</strong> 190.145.61.251</p>
+  <div class="kpi-row">
+    <span class="pill">Score indicativo: <strong>100.0</strong>/100</span>
+    <span class="pill">443: abierto</span>
+    <span class="pill">80: cerrado</span>
+    <span class="pill">Subdominios (prefijos): 0</span>
+    <span class="pill">crt.sh: 3</span>
+    <span class="pill">SAN: 2</span>
+  </div>
+  <p><strong>HTTPS:</strong> 200</p>
+  <p><strong>TLS:</strong> TLSv1.3 · <strong>Cert. hasta:</strong> Nov  2 11:51:52 2026 GMT</p>
+  <h4>Cabeceras relevantes (apex)</h4>
+  <pre class="small">{
+  &quot;server&quot;: &quot;nginx&quot;,
+  &quot;x-powered-by&quot;: &quot;PHP/8.4.4&quot;,
+  &quot;x-content-type-options&quot;: &quot;nosniff, nosniff&quot;,
+  &quot;x-frame-options&quot;: &quot;SAMEORIGIN, DENY&quot;,
+  &quot;strict-transport-security&quot;: &quot;max-age=31536000; includeSubDomains; preload&quot;,
+  &quot;content-security-policy&quot;: &quot;default-src: https://www.incocredito.com.co;object-src &#x27;none&#x27;;&quot;,
+  &quot;referrer-policy&quot;: &quot;strict-origin-when-cross-origin&quot;,
+  &quot;permissions-policy&quot;: &quot;accelerometer=(), ambient-light-sensor=(), autoplay=(self), camera=(), display-capture=(), encrypted-media=(self), fullscreen=(self), geolocation=(), gyroscope=(), interest-cohort=(), magnetometer=(), microphone=(), midi=(), payment=(self), picture-in-picture=(self), publickey-credentials-get=(self), screen-wake-lock=(), sync-xhr=(self), usb=(), web-share=(self), xr-spatial-tracking=()&quot;
+}</pre>
+  <h4>Subdominios detectados (DNS prefijos)</h4>
+  <ul class="compact"><li class="muted">Ninguno con el diccionario actual</li></ul>
+  <h4>Subdominios (crt.sh / Certificate Transparency)</h4><ul class='compact'><li><code>mail.incocredito.com.co</code></li><li><code>www.campusvirtual.incocredito.com.co</code></li><li><code>www.incocredito.com.co</code></li></ul>
+  <h4>Subject Alternative Names (SAN)</h4><ul class='compact'><li><code>*.incocredito.com.co</code></li><li><code>incocredito.com.co</code></li></ul>
+   
+    
+    <h4>Typosquatting detectados</h4><ul class='compact'><li><code>incocredito.com</code> — 54.237.127.126</li></ul>
+    <h4>Patching cadence (endoflife.date)</h4><ul class='compact'><li>✗ <strong>nginx</strong> ? — Versión no detectable desde cabeceras</li><li>✓ <strong>php</strong> 8.4.4 — Soportada hasta 2028-12-31</li></ul>
+    <h4>Dependencias de terceros (Supply Chain)</h4><ul class='compact'><li><code>www.google.com</code> (script_src) — ✓ resuelve 142.251.156.119, 142.251.150.119, 142.251.153.119</li><li><code>cdn.jsdelivr.net</code> (script_src) — ✓ resuelve 104.17.207.5, 104.17.208.5</li><li><code>cdnjs.cloudflare.com</code> (script_src) — ✓ resuelve 104.17.25.14, 104.17.24.14</li></ul>
+</section>
+
+
+  <h2 class="sec" id="puertos">Open ports (80 / 443)</h2>
+  <div class="card">
+    <p class="muted small">Solo comprobación TCP a puertos estándar (no escaneo 1–65535).</p>
+    <table class="data">
+      <thead><tr><th>IP</th><th>Dominio</th><th>Puerto</th><th>Abierto</th></tr></thead>
+      <tbody><tr><td>190.145.61.251</td><td>www.incocredito.com.co</td><td>80</td><td>No</td></tr><tr><td>190.145.61.251</td><td>www.incocredito.com.co</td><td>443</td><td>Sí</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2 class="sec" id="osint">OSINT pasivo — Certificate Transparency, SAN, CAA, MTA-STS, TLS-RPT, BIMI</h2>
+  <div class="card">
+    <p class="muted">Datos recolectados de fuentes OSINT públicas sin tráfico directo a los servidores del target (excepto consultas DNS estándar).</p>
+    <table class="data">
+      <thead><tr><th>Indicador</th><th>Valor</th><th>Descripción</th></tr></thead>
+      <tbody>
+        <tr><td>Subdominios vía crt.sh</td><td class="num">3</td><td class="small">Descubiertos desde Certificate Transparency logs (fuente pasiva)</td></tr>
+        <tr><td>Subject Alternative Names (SAN)</td><td class="num">2</td><td class="small">Nombres adicionales en el certificado TLS del apex</td></tr>
+        <tr><td>CAA record presente</td><td class="num">0/1</td><td class="small">Autorización de emisión de certificados (DNS)</td></tr>
+        <tr><td>MTA-STS presente</td><td class="num">0/1</td><td class="small">Política de seguridad SMTP MTA-STS (DNS TXT)</td></tr>
+        <tr><td>TLS-RPT presente</td><td class="num">0/1</td><td class="small">Reporte de fallos TLS por correo (DNS TXT)</td></tr>
+        <tr><td>BIMI presente</td><td class="num">0/1</td><td class="small">Brand Indicators for Message Identification (DNS TXT)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="sec" id="ransomware">Top vulnerabilities exploited by ransomware groups (referencia)</h2>
+  <div class="card">
+    <p class="muted">En el informe PDF de referencia se listan CVEs con chequeo “Passed”. Aquí no hay escaneo activo de CVE por host; use herramientas autorizadas (p. ej. nuclei con plantillas oficiales) si necesita esta capa.</p>
+    <table class="data">
+      <thead><tr><th>CVE</th><th>CVSSv3 (ref.)</th><th>Estado en este informe</th></tr></thead>
+      <tbody>
+        <tr><td>CVE-2021-44228</td><td>10.0</td><td class="muted">No evaluado (sin escaneo)</td></tr>
+        <tr><td>CVE-2018-13379</td><td>9.8</td><td class="muted">No evaluado (sin escaneo)</td></tr>
+        <tr><td>CVE-2020-5902</td><td>9.8</td><td class="muted">No evaluado (sin escaneo)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="sec" id="vulns">Vulnerability findings</h2>
+  <div class="card">
+    <p><strong>0 hallazgos</strong> de CVE en esta exportación ASM. Mensaje análogo al PDF: no se detectaron vulnerabilidades catalogadas en el alcance actual del escáner.</p>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Cuadro de informes por nivel de prueba</title>
+<style>
+@page { size: A4 landscape; margin: 14mm; }
+* { box-sizing: border-box; }
+body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9.5pt; color: #1a2332; line-height: 1.45; margin: 0; }
+h1 { font-size: 17pt; color: #0f4c81; margin: 0 0 4px 0; }
+h2 { font-size: 13pt; color: #0f4c81; border-bottom: 1.5px solid #0f4c81; padding-bottom: 2px; margin: 14px 0 6px; }
+h3 { font-size: 11pt; color: #123; margin: 10px 0 3px; }
+p { margin: 4px 0; }
+ul { margin: 4px 0 4px 16px; padding: 0; }
+li { margin: 1.5px 0; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; }
+th, td { border: 0.6px solid #9db4c8; padding: 4px 5px; vertical-align: top; text-align: left; }
+thead th { background: #0f4c81; color: #fff; font-size: 9pt; }
+tbody tr:nth-child(even) { background: #f0f5fa; }
+td:first-child { font-weight: 600; width: 12%; background: #eaf1f8; }
+blockquote { border-left: 3px solid #0f4c81; margin: 6px 0; padding: 3px 10px; background: #f3f7fb; color: #334; }
+code { font-family: Consolas, monospace; background: #eef2f6; padding: 0 2px; }
+.small { font-size: 8pt; color: #556; }
+</style>
+</head>
+<body>
+<h1>Cuadro: qu&eacute; se muestra en cada informe por nivel de prueba</h1>
+<p><strong>Informes</strong>: TPRA/HTML (principal), PP, GC, BC, S3, B1, B2, B3.
+<strong>Niveles</strong>: N1 pasivo &middot; N2 semi-activo &middot; N3 activo &middot; N4 invasivo.</p>
+
+<h2>0. Datos disponibles por nivel (base com&uacute;n a los 8 informes)</h2>
+<p class="small">Fuente: gates por <code>test_level</code> en <code>_scan_provider</code> (asm_scan.py).</p>
+<ul>
+<li><strong>N1 pasivo</strong>: DNS apex completo (IPv4/MX/NS/SPF/DMARC/DKIM/DNSSEC/CAA/MTA-STS/TLS-RPT/BIMI), subdominios CT (crt.sh), URLhaus/DNSBL, leaks, typosquatting, Social OSINT, OSINT externo (WHOIS/DNSDumpster/Shodan/Censys/theHarvester/InternetDB/Exposure), KUMO N1, Prism N1, Claude-OSINT N1.</li>
+<li><strong>N2 semi-activo</strong>: + puertos 80/443, TLS/certificado, HTTPS (status/cabeceras/redirecci&oacute;n), rutas p&uacute;blicas, vulns OSV, patching cadence, supply chain, CSP findings, cookies, WAF/cloud, KUMO N2 (favicon/robots), Prism N2 (website_analyzer), Claude-OSINT N2 (SSO/OIDC, secret scan), <strong>Strix quick</strong>.</li>
+<li><strong>N3 activo</strong>: + subdominios por fuerza bruta, subdomain takeover, port-scan completo, FinalRecon, discovery API, <strong>Strix standard</strong>.</li>
+<li><strong>N4 invasivo</strong>: + IP pivot, banner grab, CVE lookup, <strong>Strix deep</strong>.</li>
+</ul>
+<blockquote>Los bloques se renderizan <strong>solo si hay dato</strong> (status=="ok"). Strix aparece de N2 en adelante y se oculta en N1 por dise&ntilde;o. generate_asm_passive_active_report.py queda excluido de la homologaci&oacute;n pasivo/semi.</blockquote>
+
+<h2>1. Cuadro: qu&eacute; se muestra en cada informe por nivel de prueba</h2>
+<blockquote><strong>Nota de homologaci&oacute;n</strong>: el set de items es <strong>id&eacute;ntico en los 8 informes</strong> &mdash; en N1 y N2 muestran exactamente los items listados abajo; solo cambia la forma de presentarlos (bloque &lt;h4&gt;, fila fc-row, span o hallazgo resumen). Lo que var&iacute;a entre informes es el <strong>contexto extra</strong> (OWASP, scorecards, Strix).</blockquote>
+<table>
+<thead><tr><th>Informe</th><th>Pasivo (N1) &mdash; mismo set en los 8</th><th>Semi-activo (N2) &mdash; mismo set en los 8, adicional al pasivo</th><th>Activo (N3)</th><th>Invasivo (N4)</th></tr></thead>
+<tbody>
+<tr><td><strong>TPRA / HTML</strong> (socradar, principal)</td><td>DNS: IPv4/IPv6, MX, NS, SPF, DMARC, DKIM, DNSSEC, CAA, MTA-STS, TLS-RPT, BIMI &middot; Subdominios CT &middot; Credenciales (leaks) &middot; Typosquatting &middot; DNSBL/URLhaus &middot; OSINT: WHOIS, DNSDumpster, Shodan, Censys, theHarvester, Shodan InternetDB, Shodan Exposure &middot; KUMO N1: Wayback, Breach Intel, Email Harvest &middot; Prism N1: Breach Lookup, Onion/Dark Web, GitHub Recon, Gravatar &middot; Claude-OSINT N1: M365, SPF/DMARC, Org Attribution, CTI Chatter, Passive DNS, Cloud-native, HackerOne &middot; Redes sociales. Presentaci&oacute;n: bloques &lt;h4&gt; + contexto OWASP.</td><td>Al set pasivo se a&ntilde;ade: puerto 443 abierto, TLS versi&oacute;n, certificado, SAN &middot; HTTP status code, server fingerprint, redirecci&oacute;n &middot; cabeceras HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy &middot; rutas p&uacute;blicas &middot; WAF/CDN &middot; cloud storage &middot; patching cadence, supply chain, CSP findings, cookies &middot; KUMO N2: robots/Security.txt, favicon hash &middot; Prism N2: Website Analyzer &middot; Claude-OSINT N2: SSO/OIDC probe, Secret Scan &middot; Strix <em>quick</em>. Presentaci&oacute;n: bloques &lt;h4&gt;.</td><td>+ subdominios por fuerza bruta, subdomain takeover, port-scan completo (tabla de puertos), FinalRecon, discovery API, Strix <em>standard</em> (tabla hallazgos severidad/CVE/CWE/CVSS + costo LLM)</td><td>+ banner grab, CVE lookup (vulndb/EPSS/KEV), IP pivot, Strix <em>deep</em>, severidades cr&iacute;ticas</td></tr>
+<tr><td><strong>PP</strong> (ppasivo, azul sombreado)</td><td>Mismo set pasivo de la fila TPRA (DNS apex, CT, leaks, typos, DNSBL/URLhaus, OSINT externo, KUMO/Prism/CO N1, redes). Presentaci&oacute;n: filas <code>fc-row</code> prefijo &ldquo;Pasivo &middot;&rdquo;.</td><td>Mismo set semi-activo de la fila TPRA (servicios/TLS/cert, HTTP+cabeceras, rutas, WAF/cloud, mantenimiento, KUMO/Prism/CO N2). Presentaci&oacute;n: filas <code>fc-row</code> prefijo &ldquo;Semi-activo &middot;&rdquo;.</td><td>+ filas takeover, FinalRecon, API discovery, filas Strix por hallazgo</td><td>+ filas banner/CVE/pivot, Strix deep</td></tr>
+<tr><td><strong>GC</strong> (cibest)</td><td>Mismo set pasivo de la fila TPRA. Presentaci&oacute;n: &lt;h4&gt;Pasivo &middot; grupo&lt;/h4&gt; tras el bloque externo (WHOIS/DNSDumpster/Shodan).</td><td>Mismo set semi-activo de la fila TPRA. Presentaci&oacute;n: &lt;h4&gt;Semi-activo &middot; grupo&lt;/h4&gt; + Strix AI Pentest.</td><td>+ takeover, API endpoints, port-scan, Strix <em>standard</em></td><td>+ banners/CVE/pivot, Strix deep</td></tr>
+<tr><td><strong>BC</strong> (bancolombia)</td><td>Mismo set pasivo de la fila TPRA. Presentaci&oacute;n: &lt;h4&gt;Pasivo &middot; grupo&lt;/h4&gt; tras el bloque externo.</td><td>Mismo set semi-activo de la fila TPRA. Presentaci&oacute;n: &lt;h4&gt;Semi-activo &middot; grupo&lt;/h4&gt; + Strix AI Pentest.</td><td>+ takeover, API, port-scan, Strix <em>standard</em></td><td>+ banners/CVE/pivot, Strix deep</td></tr>
+<tr><td><strong>S3</strong> (scor3bank)</td><td>Mismo set pasivo de la fila TPRA. Presentaci&oacute;n: spans <code>_pasivo_canon_span</code> + scorecard KPIs (HSTS/CSP/SPF/DMARC/DNSSEC/TLS).</td><td>Mismo set semi-activo de la fila TPRA. Presentaci&oacute;n: spans <code>_semi_canon_span</code> + Strix span resumen.</td><td>+ spans port-scan/API, Strix top-3 hallazgos</td><td>+ spans banners/CVE/pivot, Strix deep</td></tr>
+<tr><td><strong>B1</strong> (beta1)</td><td>Mismo set pasivo de la fila TPRA. Presentaci&oacute;n: hallazgo resumen &ldquo;Panorama pasivo canonico&rdquo; (evidencia con todos los items).</td><td>Mismo set semi-activo de la fila TPRA. Presentaci&oacute;n: hallazgo resumen &ldquo;Panorama semi-activo canonico&rdquo; + Strix resumen.</td><td>+ hallazgos takeover/API/vulns OSV, Strix por severidad</td><td>+ hallazgos banner/CVE/pivot, Strix cr&iacute;ticos</td></tr>
+<tr><td><strong>B2</strong> (b2_scorecard)</td><td>Mismo set pasivo de la fila TPRA. Presentaci&oacute;n: hallazgo resumen.</td><td>Mismo set semi-activo de la fila TPRA. Presentaci&oacute;n: hallazgo resumen + Strix (factor Pentest IA).</td><td>+ hallazgos takeover/API/port-scan, Strix</td><td>+ hallazgos banner/CVE/pivot, Strix cr&iacute;ticos</td></tr>
+<tr><td><strong>B3</strong> (b3_unified)</td><td>Mismo set pasivo de la fila TPRA. Presentaci&oacute;n: hallazgo resumen + contexto OWASP.</td><td>Mismo set semi-activo de la fila TPRA. Presentaci&oacute;n: hallazgo resumen + Strix.</td><td>+ hallazgos takeover/API/port-scan, Strix</td><td>+ hallazgos banner/CVE/pivot, Strix cr&iacute;ticos</td></tr>
+</tbody>
+</table>
+
+<h2>2. Qu&eacute; hace Strix exactamente</h2>
+<p><strong>Strix</strong> (usestrix/strix) es un agente IA de pentesting aut&oacute;nomo (Apache-2.0). Lanza agentes con LLM que act&uacute;an como un pentester real contra el objetivo.</p>
+<h3>2.1 Reconocimiento</h3>
+<p>Mapea la superficie de ataque: subdominios, fingerprinting, enumeraci&oacute;n de endpoints y planificaci&oacute;n del ataque.</p>
+<h3>2.2 Explotaci&oacute;n real (no falsos positivos)</h3>
+<p>Inyecta SQL/NoSQL/cliente, SSRF, XSS, IDOR, auth bypass, deserializaci&oacute;n, RCE, race conditions, JWT, API, cloud...
+<strong>Cada hallazgo se valida con un PoC funcional</strong> antes de reportarse.</p>
+<h3>2.3 Herramientas dentro de un sandbox Docker (Kali)</h3>
+<ul>
+<li>Browser automatizado (Playwright) para XSS/clickjacking.</li>
+<li>Proxy de intercepci&oacute;n (Caido) para request/replay manipulation.</li>
+<li>Shell y command execution para explotaci&oacute;n y post-explotaci&oacute;n.</li>
+<li>Runtime Python para escribir y validar exploits (PoCs).</li>
+<li>Nuclei, ffuf y m&aacute;s preinstalados.</li>
+<li>An&aacute;lisis est&aacute;tico (SAST) + din&aacute;mico (DAST).</li>
+</ul>
+<h3>2.4 Orquestaci&oacute;n</h3>
+<p>Varios agentes en paralelo que colaboran y comparten hallazgos entre s&iacute;.</p>
+<h3>2.5 Salida accionable</h3>
+<p>Cada hallazgo con: severidad, CVSS, CWE/CVE, endpoint, pasos de remediaci&oacute;n y el PoC. Emite JSON/SARIF + informe ejecutivo (resumen, metodolog&iacute;a, recomendaciones).</p>
+<h3>2.6 Integraci&oacute;n en este pipeline (por nivel, tolerante)</h3>
+<ul>
+<li><strong>N1 pasivo</strong>: no corre (no aplica por dise&ntilde;o) -&gt; skipped.</li>
+<li><strong>N2 semi-activo</strong>: strix -n --target https://dominio --scan-mode quick.</li>
+<li><strong>N3 activo</strong>: --scan-mode standard.</li>
+<li><strong>N4 invasivo</strong>: --scan-mode deep.</li>
+<li>Si falta binario strix / Docker / STRIX_LLM + LLM_API_KEY -&gt; skipped sin romper el escaneo.</li>
+<li>Costo LLM controlable con --max-budget; parsea strix_runs/vulnerabilities.json y run.json.</li>
+</ul>
+
+<h2>3. Veredicto de validaci&oacute;n del &Iacute;ndice Comparativo (Indice_Comparativo_Informes.xlsx)</h2>
+<p class="small">Cruce del xlsx (4 hojas x 8 informes) contra el c&oacute;digo real de los generadores y los sets can&oacute;nicos pasivo_canon.py / semi_canon.py.</p>
+<h3>3.1 Validaci&oacute;n cuantitativa - OK</h3>
+<p>Los <strong>totales por columna cuadran</strong> en las 4 hojas (conteo de celdas SI = n&ordm; declarado en la fila TOTAL).</p>
+<h3>3.2 Correcciones aplicadas en la versi&oacute;n corregida (..._corregido.xlsx)</h3>
+<ul>
+<li><strong>Faltaban dimensiones</strong> que el c&oacute;digo s&iacute; genera y no ten&iacute;an fila propia. A&ntilde;adidas (SI en N2/N3/N4, vac&iacute;as en N1 porque no hay dato en pasivo):
+  <ul>
+  <li><code>WAF / CDN detectado</code> - item can&oacute;nico N2 (semi_canon.py) en los 8 informes.</li>
+  <li><code>Cloud storage / buckets p&uacute;blicos</code> - item can&oacute;nico N2.</li>
+  <li><code>KUMO N2 - Favicon hash</code> - item can&oacute;nico N2.</li>
+  <li><code>Prism N2 - Website Analyzer</code> - item can&oacute;nico N2.</li>
+  <li><code>Claude-OSINT N2 - Secret scan</code> - item can&oacute;nico N2.</li>
+  <li><code>Strix AI Pentest (validaci&oacute;n con PoC)</code> - en los 8 informes, solo si status==ok (bloque strix_block TPRA/GC/BC, filas fc-row PP, span S3, hallazgo "Pentest IA" B2/B3).</li>
+  </ul></li>
+<li><strong>Pasivo (N1) - SI retirados por cobertura inexistente</strong> (gates test_level en _scan_provider):
+  <ul>
+  <li>"Puertos abiertos (80/443)" B/C/I -&gt; vac&iacute;o (puertos solo desde N2).</li>
+  <li>"OSINT semi-activo (probes OIDC/SAML/ADFS)" C/F/I -&gt; vac&iacute;o (probes N2+).</li>
+  <li>"Factor OSINT semi-activo en puntaje" G/I -&gt; vac&iacute;o.</li>
+  </ul></li>
+<li><strong>Semi-activo - "Score" D/E = SI</strong>: GC y BC muestran grade-hero /100 en todos los niveles (el documento los dejaba vac&iacute;os).</li>
+<li><strong>"Resultado (score num&eacute;ricamente distinto...)" movido fuera de la matriz</strong>: es nota metodol&oacute;gica; queda como NOTA debajo de la fila TOTAL y deja de contar.</li>
+</ul>
+<h3>3.3 Observaciones por confirmar (no corregidas)</h3>
+<p>Semi-activo "Score general": tras el fix queda SI en las 8 columnas (coherente). "Superficie de ataque" + "Superficie ampliada" solapan parcialmente con las filas granulares; se mantienen por criterio del autor.</p>
+
+</body>
+</html>
