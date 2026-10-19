@@ -47,6 +47,7 @@ Uso real en runtime: `fastapi, pydantic, uvicorn, async_playwright` (dashboard_s
 - `api_discovery.py`, `subdomain_brute.py`, `banner_grab.py`, `port_scanner.py`, `ip_pivot.py`.
 - `finalrecon_runner.py` — orquesta FinalRecon (subdominios, correos, DNS, GeoIP).
 - `vuln_lookup.py` — CVEs (vulndb CSVs + EPSS + CISA KEV).
+- Regla correo/DNS al apex (`apex_of` en `asm_scan.py:resolve_dns`): MX/SPF/DMARC/DKIM/NS se consultan sin el `www.` (preguntar al host da falsos ausentes). `TLSProbe.chain_issue` + reintento con certificado (cadena incompleta vs TLS caído); `HTTPProbe.verified` + reintento sin validar para estado/cabeceras reales.
 - `external_sources.py` — **OSINT + fuentes externas**: `run_all(domain)` devuelve dict con claves
   `whois, dnsdumpster, shodan, censys, theharvester, internetdb, shodan_exposure, scanned_at`. Integra Shodan InternetDB
   (sin API key, `https://internetdb.shodan.io/{ip}`) y una heurística de "exposure".
@@ -82,44 +83,56 @@ Uso real en runtime: `fastapi, pydantic, uvicorn, async_playwright` (dashboard_s
 - `cloud_storage_scan.py` — detección de buckets/cloud storage (adaptado de Raccoon MIT).
 
 **Reportes (multi-brand):**
-- `pasivo_canon.py` — **set canónico de items pasivos (nivel 1) compartido por los 8 generadores**.
+- `pasivo_canon.py` — **set canónico de items pasivos (nivel 1) compartido por los generadores vivos con canon (B5-B6)**.
   `collect_pasive_items(p)` (typo "pasive" intencional) devuelve la lista canónica ordenada con estado explícito por item
   (`ok|vacio|sinclave|error|sinDatos`) y 10 grupos: DNS apex completo (IPv4/MX/NS/SPF/DMARC/DKIM/DNSSEC/CAA/MTA-STS/
   TLS-RPT/BIMI), Subdominios CT, leaks, typosquatting, DNSBL/URLhaus, OSINT externo (WHOIS/DNSDumpster/Shodan/Censys/
   theHarvester/InternetDB/Exposure), KUMO N1, Prism N1, Claude-OSINT N1 y Social OSINT. Los generadores filtran
-  `status=="ok"` (solo items con dato) para que en modo "pasivo" los 8 informes muestren exactamente el MISMO set de
-  items, cada uno con su estilo: TPRA `pasivo_canon_block` tras `_external_block`; PP filas `fc-row` con prefijo
-  `Pasivo ·`; GC/BC `<h4>Pasivo · grupo</h4>` al final de `_external_block`; S3 `_pasivo_canon_span`; B1/B2/B3 un
-  hallazgo resumen `Panorama pasivo canonico` (evidencia con detalle por grupos, truncado a 3000).
-- `semi_canon.py` — **set canónico de items semi-activos (nivel 2) compartido por los 8 generadores**.
+  `status=="ok"` (solo items con dato) para que en modo "pasivo" los 5 informes muestren exactamente el MISMO set de
+  items, cada uno con su estilo: TPRA `pasivo_canon_block` tras `_external_block`; B5-B6 `<h4>Pasivo · grupo</h4>`
+  y hallazgo resumen `Panorama pasivo canonico` (evidencia con detalle por grupos, truncado a 3000).
+  (Estilos retirados: PP filas `fc-row`, GC/BC `<h4>`, S3 `_pasivo_canon_span`, B1/B2 hallazgo.)
+- `semi_canon.py` — **set canónico de items semi-activos (nivel 2) compartido por los generadores vivos con canon (B5-B6)**.
   `collect_semi_active_items(p)` devuelve los items adicionales al pasivo en modo "semi-activo" (mismo estado
   `ok|vacio|sinclave|error`): Servicios (Puerto 443/TLS/Certificado/SAN), HTTPS (HTTP status/fingerprint/redirección),
   Cabeceras de seguridad (HSTS/CSP/XFO/XCTO/Referrer-Policy/Permissions-Policy), Superficie web (rutas públicas/WAF/
   cloud), Mantenimiento (patching/supply chain/CSP findings/cookies), KUMO N2 (favicon hash), Prism N2
   (Website Analyzer) y Claude-OSINT N2 (SSO/OIDC probe/secret scan). Render por estilo análogo al pasivo: TPRA
-  `semi_canon_block` tras `pasivo_canon_block`; PP `fc-row` prefijo `Semi-activo ·`; GC/BC `<h4>Semi-activo · grupo</h4>`;
-  S3 `_semi_canon_span` tras `_pasivo_canon_span`; B1/B2/B3 hallazgo `Panorama semi-activo canonico`. El detalle por
-  grupo NO trunca por grupo (usa todos los items del grupo, solo topa a 3000 chars).
+  `semi_canon_block` tras `pasivo_canon_block`; B5-B6 `<h4>Semi-activo · grupo</h4>` y hallazgo
+  `Panorama semi-activo canonico`. El detalle por grupo NO trunca por grupo (usa todos los items del grupo, solo topa a 3000 chars).
 - `generate_socradar_style_report.py` — informe **TPRA** principal (activo). Bloques por proveedor incl. WAF/cloud,
   `kumo_block`, `prism_block` y `claude_osint_block`, y secciones `Shodan InternetDB` / `Shodan Internet Exposure`.
-- `generate_ppasivo_report.py` — informe **Ppasivo** (pasivo, blue sombreado). Cover + f-listas por proveedor, incl.
-  filas `Shodan InternetDB` / `Shodan Exposure` y filas KUMO + Prism + Claude-OSINT (`fc-row`).
-- Otros (variantes por cliente): `generate_cibest_report.py`, `generate_bancolombia_report.py`,
-  `generate_b2_scorecard_report.py`, `generate_b3_unified_report.py`, `generate_scor3bank_report.py`,
-  `generate_beta1_report.py`, `generate_asm_passive_active_report.py`. Todos (salvo el passivo-active) integran Prism
-  y Claude-OSINT como bloque al final de `_external_block` (GC/BC), spans en header (S3 `_prism_span` /
-  `_claude_osint_span` en TPRA `claude_osint_block` tras `prism_block`) o hallazgos (B1/B2/B3). Todos (salvo el
-  passivo-active) integran además `collect_pasive_items(p)` de `pasivo_canon.py` para el panorama pasivo homologado y
-  `collect_semi_active_items(p)` de `semi_canon.py` para el panorama semi-activo homologado. Todos (salvo el
-  passivo-active) renderizan también el enriquecimiento **Strix** (`ProviderASM.strix`) solo si su `status=="ok"`
-  (aparece únicamente cuando hay data): TPRA `strix_block` (tabla de hallazgos severidad/CVE/CWE/CVSS + costo LLM) tras
-  `claude_osint_block`; PP filas `fc-row` `Strix ·`; GC/BC `<h4>Strix AI Pentest</h4>`; S3 `_strix_span` (resumen +
-  top 3); B1/B2/B3 hallazgo `Strix AI Pentest` con severidad por severidades.
-- Exportaciones: `generate_sarif_export.py`, `generate_openapi_export.py`, `generate_dast_config.py`.
+- **RETIRADOS 2026-10-13** (generador ausente en disco, endpoints dados de baja): `generate_ppasivo_report.py`,
+  `generate_bancolombia_report.py`, `generate_scor3bank_report.py`. No se construyen ni se descargan; la UI solo ofrece SARIF/OpenVEX en su lugar.
+- **RETIRADOS 2026-10-14**: `generate_cibest_report.py` (GC), `generate_beta1_report.py` (B1),
+  `generate_b2_scorecard_report.py` (B2).
+- **RETIRADOS 2026-10-14**: `generate_socradar_style_report.py` (TPRA, "PDF Generic"). Sin dependencias de otros formatos; endpoints y botones dados de baja.
+- **RETIRADOS 2026-10-15**: `generate_b3_unified_report.py` (B3) y `generate_b4_unified_report.py` (B4). B5 ya era
+  superconjunto estricto de ambos; el dashboard importa `domain_score`/`compute_factores` desde `generate_b5_unified_report.py`.
+  Endpoints `/api/download/{pdf,html}-b3|b4` y `/api/history/{id}/{pdf,html}-b3|b4` dados de baja (fallbacks de historial
+  ahora `(6, 7, 5)`); botones y documentacion de la UI solo ofrecen B5-B7.
+- Generadores vivos (5): `generate_b5/b6_unified_report.py`, `generate_b7_unified_report.py` (B7),
+  `generate_asm_passive_active_report.py`. Los clasicos (B5-B6)
+  integran Prism y Claude-OSINT (`claude_osint_block`/`prism_block`; B5-B6 como hallazgos/bloques),
+  `collect_pasive_items(p)` y `collect_semi_active_items(p)` para los panoramas homologados, y **Strix** solo si su
+  `status=="ok"` (B5-B6 hallazgo). B7 (SSC-style) consume `kumo.breachintel` y
+  `claude_osint.cti_chatter` dentro de `collect_issues`, mas issues OWASP Agentic/Web (`appsec`). Passive-active solo
+  grid OWASP propio, sin Prism/Strix por diseno.
+- Exportaciones: `generate_sarif_export.py`, `generate_vex_export.py` (OpenVEX 0.2.0, explotabilidad), `generate_openapi_export.py`, `generate_dast_config.py`.
+- `owasp_web.py` — espejo de `owasp_agentic.py` contra OWASP Web Top 10 2025 (W-01..W-10); `_scan_provider` lo evalua a `m["owasp_web"]` junto a `m["owasp"]`. Renderizado junto al bloque Agentic en B5-B6 (`<h4>`) y passive-active (grid) + B7 como issues `appsec` (Agentic y Web con impacto -3.0/-1.5/-0.5 por grado).
+- `severity.py` — severidades canonicas CRITICAL/HIGH/MEDIUM/LOW/INFO (hve-core security-reviewer-formats) + `sarif_level/normalize/rank`. Cableado en `generate_sarif_export.py` (`_issue_to_result`) y en B5/B6 (`import severity`; comparaciones `== "high"/"medium"`, orden de Strix y mapa CSP via `normalize`, identico en datos EN). VEX no tiene eje de severidad por spec.
+- Descargas del dashboard: `/api/download/sarif`, `/api/download/vex` (+ `/api/history/{id}/sarif|vex`), generadas al vuelo desde `asm_report.json` via `build_sarif_log/build_vex_doc`; `/api/download/sbom` (CycloneDX del producto, sin variante de historial por ser estatico).
+- B6 tres metricas con motor propio, en orden (B6-v3.1, 2026-10-16): Overall = benchmark B7 (`b7_provider_scores()`, sec. 4); Domain = higiene B5/B6 (`domain_score` por proveedor, sec. 5); Factor = consolidacion B5/B6 (`compute_factores` 10 factores, sec. 6). Sin doble deduccion entre metricas; la trazabilidad heuristica audita el Factor Score y la auditoria B7 (sec. 4.1) el Overall. `_B6_SSC` queda como catalogo canonico de los 10 nombres (orden + test).
+- `generate_sbom_export.py` — SBOM CycloneDX 1.5 del producto (`requirements*.txt` como purls + 8 vendorizados/externos). Cubre skill hve-core supply-chain-security a nivel inventario.
+- `llm_guardrails.py` — guardarrailes OWASP LLM 2025 para Strix: LLM10 presupuesto (`STRIX_BUDGET_USD`, default 5.0), LLM06 modo atado al nivel, LLM02 redaccion de secretos en stdout/stderr. `run_strix` adjunta `guardrails` en `status=="ok"`.
+- `tests/` — suite `unittest` stdlib (23 tests: severity, owasp_web, owasp_agentic, exports, guardrails). Corre con `python -m unittest discover -s tests` en ambos interpretes; paso en `pr-validation.yml`.
+- `docs/risks/` — `risk-register.md` + `risk-mitigation-plan.md` (matriz P×I, skill hve-core risk-register).
 
 **Servidor / entrega:**
 - `dashboard_server.py` — **servidor FastAPI** (HTTPS 8765) que ejecuta escaneos bajo demanda y sirve
-  reportes/descargas/edeaa.
+  reportes/descargas/edeaa. El historial (`/api/history`) agrega por escaneo Sector (autodetectado
+  precia o `sector`/`industry`/`industria` en providers.json), Score (overall precia), Riesgos
+  (conteo por severidad mayor) y Estado (Bueno >=90, Atencion >=80, si no Revisar).
 
 ---
 
@@ -147,16 +160,18 @@ python asm_scan.py --providers providers.json --out-json salida_test/asm_report.
 ```
 # TPRA (SOCRadar-style)
 python generate_socradar_style_report.py --asm <asm_report.json> --out <informe.html>
-# Ppasivo (el arg es --input/--output)
-python generate_ppasivo_report.py --input <asm_report.json> --output <informe.html>
+# SARIF + OpenVEX
+python generate_sarif_export.py --input <asm_report.json> --output <asm_sarif.json>
+python generate_vex_export.py --input <asm_report.json> --output <asm_vex.json>
 ```
-> OJO: el argumento del TPRA es `--asm`; el da Ppasivo es `--input`. Revisar `--help` de cada uno.
+> Todos los generadores vivos y exportes usan `--asm/--input` y `--out/--output` (`--asm` en TPRA/GC/B1-B7; `--input` en SARIF/VEX). Revisar `--help` de cada uno.
 
 ### Servidor
 ```
 python dashboard_server.py --host 0.0.0.0 --port 8765 --ssl
 ```
-Usa `cert.pem`/`key.pem` para HTTPS. Usa envs `ASM_DASHBOARD_HOST/PORT`.
+Usa TLS de `C:\ProgramData\ASM-Dashboard\` (`ASM_TLS_CERT`/`ASM_TLS_KEY`) para HTTPS. Usa envs `ASM_DASHBOARD_HOST/PORT`.
+Escritura API con bearer (`ASM_API_TOKEN` o `api_token.txt` generado al primer arranque); ver `SECURITY.md`.
 
 ---
 
@@ -235,3 +250,25 @@ async def main():
         await b.close()
 asyncio.run(main())
 ```
+
+---
+
+## 12. Regla Vibe Coding / opencode (2026-10-08: limpieza 148 -> 44 py)
+
+- **Prohibido** crear `check_*.py, fix_*.py, move_*.py, find_*.py, add_*.py, remove_*.py, insert_*.py, debug_*.py` en raiz. Van a `C:\Users\ADMINI~1\AppData\Local\Temp\2\opencode` y se borran al terminar.
+- Un solo `repro.py` por tarea, nunca 10 variantes.
+- Pedir cambios por archivo + linea (`solo generate_b6_unified_report.py: salto de pagina antes de X`), no "arregla todo".
+- `opencode.json:watcher.ignore` excluye `.venv, dashboard_workspace, salida_test, logs, vulndb, tools/_archive, *.html`. `tools/_archive/**` denegado en `permission`.
+- `tools/_archive/` en `.gitignore`: no se versiona ni se indexa.
+
+---
+
+## 13. Auditoria - Modelo, subagentes y skills (2026-10-08)
+
+- **Principal**: `opencode/muse-spark-1.3-contributor-free` (Muse Spark 1.3).
+- **Subagentes via `Task`**: `explore` (busqueda rapida solo-lectura) y `general` (tareas complejas multi-paso). Mas `threat-detection-engineer` (read-only: `bash: deny, edit: deny` en `Workflow/.opencode/agents/threat-detection-engineer.md`).
+- **Skill activo en proyecto (1)**: `threat-detection-engineer` en `Workflow/.opencode/skills/threat-detection-engineer/SKILL.md` (Sigma + ATT&CK + tuning, MIT).
+- **Libreria global bajo demanda (818, no instalados)**: `C:\Users\Administrator\.agents\skills\` (origen `mukul975/Anthropic-Cybersecurity-Skills`). Se cargan por nombre con `skill`, nunca todos en `opencode.json:instructions`.
+- **Subset curado para auditar este ASM** (usar solo estos, el resto solapa):
+  `implementing-attack-surface-management, performing-subdomain-enumeration-with-subfinder, performing-ssl-tls-security-assessment, performing-security-headers-audit, implementing-secret-scanning-with-gitleaks, detecting-typosquatting-packages, performing-cve-prioritization-with-kev-catalog, implementing-epss-score-for-vulnerability-prioritization, performing-dns-enumeration-and-zone-transfer, analyzing-typosquatting-domains-with-dnstwist, performing-network-packet-capture-analysis, triaging-vulnerabilities-with-ssvc-framework`.
+- **Respuesta oficial para auditoria**: "Principal Muse Spark 1.3 contributor-free, subagentes explore/general (+ threat-detection-engineer read-only), 818 skills disponibles bajo demanda, 1 skill activo."

@@ -53,10 +53,12 @@ import warnings
 warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWarning)
 import social_osint
 import owasp_agentic
+import owasp_web
 import log_utils
 import finalrecon_runner
 import external_sources
 import subdomain_brute
+import alterx_perm
 import port_scanner
 import proxy_rotation
 import ip_pivot
@@ -72,6 +74,12 @@ import strix_integration
 import who_dat_integration
 import nuclei_integration
 import gobuster_integration
+import scorecard_enrich
+import dns_extra
+import origin_ip
+import hotlist
+import xorcism_enrich
+import rengine_enrich
 
 TIMEOUT = 12
 USER_AGENT = "ASM-Incocredito-Proveedores/1.0 (+research)"
@@ -144,6 +152,7 @@ class TLSProbe:
     cert_version: str | None
     san_list: list[str] = field(default_factory=list)
     error: str | None = None
+    chain_issue: bool = False
 
 
 @dataclass
@@ -162,6 +171,7 @@ class HTTPProbe:
     cf_ray: str | None
     x_cdn: str | None
     error: str | None = None
+    verified: bool = True
 
 
 @dataclass
@@ -218,6 +228,8 @@ class ProviderASM:
     finalrecon: dict[str, Any] = field(default_factory=dict)
     open_ports: list[dict[str, Any]] = field(default_factory=list)
     brute_subs: list[dict[str, Any]] = field(default_factory=list)
+    perm_subs: list[dict[str, Any]] = field(default_factory=list)
+    perm_wildcard: bool = False
     pivot_results: list[dict[str, Any]] = field(default_factory=list)
     banner_grabs: list[dict[str, Any]] = field(default_factory=list)
     cve_findings: list[dict[str, Any]] = field(default_factory=list)
@@ -231,6 +243,28 @@ class ProviderASM:
     who_dat: dict[str, Any] = field(default_factory=dict)
     nuclei: dict[str, Any] = field(default_factory=dict)
     gobuster: dict[str, Any] = field(default_factory=dict)
+    scorecard: dict[str, Any] = field(default_factory=dict)
+    zone_transfer: dict[str, Any] = field(default_factory=dict)
+    noerror_subs: list[dict[str, Any]] = field(default_factory=list)
+    origin_ips: dict[str, Any] = field(default_factory=dict)
+    hotlist: dict[str, Any] = field(default_factory=dict)
+    fusion: dict[str, Any] = field(default_factory=dict)
+    ctem: dict[str, Any] = field(default_factory=dict)
+    insurance: dict[str, Any] = field(default_factory=dict)
+    pqc: dict[str, Any] = field(default_factory=dict)
+    ransomware: dict[str, Any] = field(default_factory=dict)
+    gf: dict[str, Any] = field(default_factory=dict)
+    interesting: dict[str, Any] = field(default_factory=dict)
+    webports: dict[str, Any] = field(default_factory=dict)
+
+
+def apex_of(domain: str) -> str:
+    """Apex organizativo para correo/DNS-org: MX/SPF/DMARC/DKIM/NS viven en el
+    apex, no en el host (preguntar a www. da falsos ausentes)."""
+    d = (domain or "").strip().lower().rstrip(".")
+    if d.startswith("www."):
+        return d[4:]
+    return d
 
 
 def resolve_dns(domain: str) -> DNSProbe:
@@ -241,6 +275,7 @@ def resolve_dns(domain: str) -> DNSProbe:
     dmarc_policy: str | None = None
     mx_records: list[dict[str, str]] = []
     ns_records: list[dict[str, str]] = []
+    apex = apex_of(domain)
     errors: list[str] = []
 
     try:
@@ -258,15 +293,15 @@ def resolve_dns(domain: str) -> DNSProbe:
         errors.append(f"AAAA: {e}")
 
     try:
-        for r in dns.resolver.resolve(domain, "TXT", lifetime=8):
+        for r in dns.resolver.resolve(apex, "TXT", lifetime=8):
             txt = b"".join(r.strings).decode("utf-8", errors="replace")
             if txt.strip().lower().startswith("v=spf1"):
                 spf_record = txt
                 break
     except Exception as e:
-        errors.append(f"TXT/SPF: {e}")
+        errors.append(f"TXT/SPF@{apex}: {e}")
 
-    dmarc_name = f"_dmarc.{domain}"
+    dmarc_name = f"_dmarc.{apex}"
     try:
         for r in dns.resolver.resolve(dmarc_name, "TXT", lifetime=8):
             txt = b"".join(r.strings).decode("utf-8", errors="replace")
@@ -279,27 +314,27 @@ def resolve_dns(domain: str) -> DNSProbe:
                         break
                 break
     except Exception as e:
-        errors.append(f"TXT/DMARC: {e}")
+        errors.append(f"TXT/DMARC@{apex}: {e}")
 
-    # MX records
+    # MX records (apex: el correo vive en la organizacion, no en el host)
     try:
-        for r in dns.resolver.resolve(domain, "MX", lifetime=8):
+        for r in dns.resolver.resolve(apex, "MX", lifetime=8):
             mx_records.append({"preference": str(r.preference), "exchange": str(r.exchange).rstrip('.')})
     except Exception as e:
-        errors.append(f"MX: {e}")
+        errors.append(f"MX@{apex}: {e}")
 
-    # NS records
+    # NS records (apex: los NS viven en la zona, no en el host)
     try:
-        for r in dns.resolver.resolve(domain, "NS", lifetime=8):
+        for r in dns.resolver.resolve(apex, "NS", lifetime=8):
             ns_records.append({"nameserver": str(r.target).rstrip('.')})
     except Exception as e:
-        errors.append(f"NS: {e}")
+        errors.append(f"NS@{apex}: {e}")
 
     # DNSSEC
     dnssec_ok = query_dnssec(domain)
 
-    # DKIM
-    dkim_records = query_dkim(domain)
+    # DKIM (apex: los selectores viven bajo el dominio organizativo)
+    dkim_records = query_dkim(apex)
 
     # DANE/TLSA
     dane_records = query_dane(domain)
@@ -347,38 +382,89 @@ def probe_tls(domain: str) -> TLSProbe:
     cert_subject = cert_issuer = cert_expiry = cert_serial = cert_version = None
     san_list: list[str] = []
     err: str | None = None
+    chain_issue = False
+
+    def _fill_der(der: bytes | None) -> None:
+        """Extrae sujeto/emisor/vencimiento/SAN de un DER sin validar la cadena
+        (solo para describir el fallo real cuando la validación falla)."""
+        nonlocal cert_subject, cert_issuer, cert_expiry, cert_serial, cert_version, san_list
+        if not der:
+            return
+        try:
+            from cryptography import x509 as _x509
+        except Exception:
+            return
+        try:
+            c = _x509.load_der_x509_certificate(der)
+            cert_subject = c.subject.rfc4514_string()[:300]
+            cert_issuer = c.issuer.rfc4514_string()[:300]
+            try:
+                cert_expiry = c.not_valid_after_utc.strftime("%b %d %H:%M:%S %Y %Z")
+            except Exception:
+                cert_expiry = str(getattr(c, "not_valid_after", ""))[:40]
+            try:
+                cert_serial = format(c.serial_number, "X")
+            except Exception:
+                pass
+            try:
+                san = c.extensions.get_extension_for_class(_x509.SubjectAlternativeName)
+                san_list = san.value.get_values_for_type(_x509.DNSName)[:20]
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _fill(ssock) -> None:
+        nonlocal negotiated, cert_subject, cert_issuer, cert_expiry, cert_serial, cert_version, san_list
+        negotiated = tls_version_name(ssock.version())
+        cert = ssock.getpeercert()
+        if cert:
+            subj = cert.get("subject")
+            if subj:
+                parts = []
+                for tup in subj:
+                    for k, v in tup:
+                        parts.append(f"{k}={v}")
+                cert_subject = ", ".join(parts)
+            iss = cert.get("issuer")
+            if iss:
+                parts = []
+                for tup in iss:
+                    for k, v in tup:
+                        parts.append(f"{k}={v}")
+                cert_issuer = ", ".join(parts)
+            nb = cert.get("notAfter")
+            if nb:
+                cert_expiry = nb
+            cert_serial = cert.get("serialNumber")
+            # cert version is an integer (e.g., 2 for X509 v3)
+            version_int = cert.get("version")
+            if version_int is not None:
+                cert_version = str(version_int)
+            san_list = extract_san(cert)
 
     # Default TLS handshake
     try:
         ctx = ssl.create_default_context()
         with socket.create_connection((domain, 443), timeout=8) as raw:
             with ctx.wrap_socket(raw, server_hostname=domain) as ssock:
-                negotiated = tls_version_name(ssock.version())
-                cert = ssock.getpeercert()
-                if cert:
-                    subj = cert.get("subject")
-                    if subj:
-                        parts = []
-                        for tup in subj:
-                            for k, v in tup:
-                                parts.append(f"{k}={v}")
-                        cert_subject = ", ".join(parts)
-                    iss = cert.get("issuer")
-                    if iss:
-                        parts = []
-                        for tup in iss:
-                            for k, v in tup:
-                                parts.append(f"{k}={v}")
-                        cert_issuer = ", ".join(parts)
-                    nb = cert.get("notAfter")
-                    if nb:
-                        cert_expiry = nb
-                    cert_serial = cert.get("serialNumber")
-                    # cert version is an integer (e.g., 2 for X509 v3)
-                    version_int = cert.get("version")
-                    if version_int is not None:
-                        cert_version = str(version_int)
-                    san_list = extract_san(cert)
+                _fill(ssock)
+    except ssl.SSLCertVerificationError as e:
+        # La cadena no es confiable pero el puerto negocia TLS: reintentar sin
+        # validar para capturar version/certificado y describir el fallo real
+        # (cadena incompleta vs expirado) en vez de "TLS: None".
+        err = str(e)
+        chain_issue = True
+        try:
+            ctx_nv = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ctx_nv.check_hostname = False
+            ctx_nv.verify_mode = ssl.CERT_NONE
+            with socket.create_connection((domain, 443), timeout=8) as raw:
+                with ctx_nv.wrap_socket(raw, server_hostname=domain) as ssock:
+                    negotiated = tls_version_name(ssock.version())
+                    _fill_der(ssock.getpeercert(binary_form=True))
+        except Exception:
+            pass
     except Exception as e:
         err = str(e)
         return TLSProbe(
@@ -416,7 +502,8 @@ def probe_tls(domain: str) -> TLSProbe:
         cert_serial=cert_serial,
         cert_version=cert_version,
         san_list=san_list,
-        error=None,
+        error=err,
+        chain_issue=chain_issue,
     )
 
 
@@ -432,12 +519,13 @@ def session_with_retries() -> requests.Session:
 def probe_https(domain: str, sess: requests.Session) -> HTTPProbe:
     url = f"https://{domain}/"
     redirect_chain: list[str] = []
-    try:
+
+    def _do(verify: bool) -> HTTPProbe:
         r = sess.get(
             url,
             timeout=TIMEOUT,
             allow_redirects=True,
-            verify=True,
+            verify=verify,
         )
         for h in r.history:
             redirect_chain.append(f"{h.status_code} {h.url}")
@@ -494,11 +582,21 @@ def probe_https(domain: str, sess: requests.Session) -> HTTPProbe:
             cf_ray=hmap.get("cf-ray"),
             x_cdn=hmap.get("x-cdn"),
             error=None,
+            verified=verify,
         )
+
+    try:
+        return _do(True)
     except requests.exceptions.SSLError as e:
-        return HTTPProbe(None, None, False, [], {}, None, None, None, None, None, None, None, None, error=f"SSL: {e}")
+        # La cadena no es confiable pero el sitio responde: reintentar sin
+        # validar para observar estado/cabeceras reales (verified=False).
+        # El problema de confianza queda registrado en TLS (chain_issue).
+        try:
+            return _do(False)
+        except requests.exceptions.RequestException as e2:
+            return HTTPProbe(None, None, False, [], {}, None, None, None, None, None, None, None, None, None, error=f"SSL: {e} / reintento sin validar: {e2}")
     except requests.exceptions.RequestException as e:
-        return HTTPProbe(None, None, False, [], {}, None, None, None, None, None, None, None, None, error=str(e))
+        return HTTPProbe(None, None, False, [], {}, None, None, None, None, None, None, None, None, None, error=str(e))
 
 
 def enumerate_subdomains(apex: str) -> list[dict[str, Any]]:
@@ -1657,6 +1755,10 @@ def build_matrix_row(p: ProviderASM) -> dict[str, Any]:
         "brute_subs": p.brute_subs,
         "brute_sub_count": len(p.brute_subs),
         "brute_sub_list": [b.get("fqdn", "") for b in p.brute_subs],
+        "perm_subs": p.perm_subs,
+        "perm_sub_count": len(p.perm_subs),
+        "perm_sub_list": [b.get("fqdn", "") for b in p.perm_subs],
+        "perm_wildcard": p.perm_wildcard,
         "pivot_results": p.pivot_results,
         "pivot_count": len(p.pivot_results),
         "pivot_fqdns": list({f for r in p.pivot_results for f in r.get("fqdns_from_crt", [])}),
@@ -1686,6 +1788,10 @@ def build_matrix_row(p: ProviderASM) -> dict[str, Any]:
         m["owasp"] = owasp_agentic.evaluate_provider(m)
     except Exception as e:
         m["owasp"] = {"overall_compliance": 0, "overall_grade": "?", "risks": {}, "error": str(e)}
+    try:
+        m["owasp_web"] = owasp_web.evaluate_provider(m)
+    except Exception as e:
+        m["owasp_web"] = {"overall_compliance": 0, "overall_grade": "?", "risks": {}, "error": str(e)}
     return m
 
 
@@ -2233,6 +2339,32 @@ def _scan_provider(row: dict[str, str], args: argparse.Namespace, test_level: in
             log.warning("Brute subs error: %s", exc)
     _log_step("brute_subs")
 
+    perm_subs_data: list[dict[str, Any]] = []
+    perm_wildcard = False
+    if test_level >= 2:
+        try:
+            apex = apex_of(domain)
+            seeds: list[Any] = list(subs) + list(crt_subs)
+            if test_level >= 3:
+                seeds += brute_subs_data
+            existing = (
+                {(s.get("fqdn") or s.get("host") or "").lower() for s in subs}
+                | {c.lower() for c in crt_subs}
+                | {b.get("fqdn", "").lower() for b in brute_subs_data}
+            )
+            perm_res = alterx_perm.permute_subdomains(
+                apex, seeds, existing=existing, max_workers=50, timeout=45
+            )
+            perm_subs_data = perm_res.get("results", [])
+            perm_wildcard = bool(perm_res.get("wildcard"))
+            log.info(
+                "DNS permutations: %d nuevos (generados=%d, wildcard=%s)",
+                len(perm_subs_data), perm_res.get("generated", 0), perm_wildcard,
+            )
+        except Exception as exc:
+            log.warning("DNS permutations error: %s", exc)
+    _log_step("dns_permutations")
+
     pivot_data: list[dict[str, Any]] = []
     if test_level >= 4:
         try:
@@ -2292,6 +2424,20 @@ def _scan_provider(row: dict[str, str], args: argparse.Namespace, test_level: in
         except Exception as exc:
             log.warning("Cloud storage scan error: %s", exc)
     _log_step("waf+cloud")
+
+    origin_data: dict[str, Any] = {}
+    if test_level >= 2:
+        try:
+            origin_data = origin_ip.run_origin(
+                domain, main_ips=list(dns_p.ipv4), cnames=cnames,
+                external_data=external_data, waf_data=waf_data)
+            if origin_data.get("exposed"):
+                ips = ", ".join(str(c.get("ip")) for c in origin_data.get("origin_candidates", [])[:3])
+                log.info("Origin IP expuesta tras CDN/WAF en %s: %s", domain, ips)
+        except Exception as exc:
+            origin_data = {}
+            log.warning("Origin IP discovery error: %s", exc)
+    _log_step("origin_ip")
 
     kumo_data: dict[str, Any] = {}
     try:
@@ -2370,7 +2516,40 @@ def _scan_provider(row: dict[str, str], args: argparse.Namespace, test_level: in
         log.warning("Gobuster enrichment error: %s", exc)
     _log_step("gobuster")
 
-    return ProviderASM(
+    scorecard_data: dict[str, Any] = {}
+    if test_level >= 2 and row.get("github"):
+        try:
+            scorecard_data = scorecard_enrich.provider_scorecard(row)
+            agg = scorecard_data.get("aggregate") or {}
+            log.info(
+                "Scorecard: %d repo(s), score medio=%s en %s (nivel %d)",
+                agg.get("scored", 0), agg.get("mean"), domain, test_level,
+            )
+        except Exception as exc:
+            scorecard_data = {"status": "error", "error": str(exc)}
+            log.warning("Scorecard enrichment error: %s", exc)
+    _log_step("scorecard")
+
+    zone_transfer_data: dict[str, Any] = {}
+    noerror_data: list[dict[str, Any]] = []
+    if test_level >= 3:
+        try:
+            apex = apex_of(domain)
+            dnsx = dns_extra.run_dns_extra(apex, do_axfr=True, do_noerror=True)
+            zone_transfer_data = dnsx.get("zone_transfer") or {}
+            noerror_data = dnsx.get("noerror_subs") or []
+            if zone_transfer_data.get("vulnerable"):
+                log.info("AXFR permitido en %s desde %s (%d registros)",
+                         apex, zone_transfer_data.get("ns"), len(zone_transfer_data.get("records") or []))
+            if noerror_data:
+                log.info("NOERROR DNS discovery: %d nombre(s) existentes sin A en %s", len(noerror_data), apex)
+        except Exception as exc:
+            zone_transfer_data = {}
+            noerror_data = []
+            log.warning("DNS extra (AXFR/NOERROR) error: %s", exc)
+    _log_step("dns_extra")
+
+    p = ProviderASM(
         id=row["id"],
         name=row["name"],
         domain=domain,
@@ -2403,6 +2582,8 @@ def _scan_provider(row: dict[str, str], args: argparse.Namespace, test_level: in
         cookie_findings=cookie_findings_list,
         open_ports=open_ports_data,
         brute_subs=brute_subs_data,
+        perm_subs=perm_subs_data,
+        perm_wildcard=perm_wildcard,
         pivot_results=pivot_data,
         banner_grabs=banner_data,
         cve_findings=cve_data,
@@ -2416,7 +2597,35 @@ def _scan_provider(row: dict[str, str], args: argparse.Namespace, test_level: in
         who_dat=who_dat_data,
         nuclei=nuclei_data,
         gobuster=gobuster_data,
+        scorecard=scorecard_data,
+        zone_transfer=zone_transfer_data,
+        noerror_subs=noerror_data,
+        origin_ips=origin_data,
     )
+
+    try:
+        p.hotlist = hotlist.build_hotlist(dataclass_to_dict(p))
+    except Exception as exc:
+        log.warning("Hotlist build error: %s", exc)
+
+    try:
+        _xo = xorcism_enrich.build_xorcism(dataclass_to_dict(p))
+        p.fusion = _xo.get("fusion") or {}
+        p.ctem = _xo.get("ctem") or {}
+        p.insurance = _xo.get("insurance") or {}
+        p.pqc = _xo.get("pqc") or {}
+        p.ransomware = _xo.get("ransomware") or {}
+    except Exception as exc:
+        log.warning("XORCISM enrich build error: %s", exc)
+
+    try:
+        _rn = rengine_enrich.build_rengine(dataclass_to_dict(p))
+        p.gf = _rn.get("gf") or {}
+        p.interesting = _rn.get("interesting") or {}
+        p.webports = _rn.get("webports") or {}
+    except Exception as exc:
+        log.warning("reNgine enrich build error: %s", exc)
+    return p
 
 
 def main() -> int:
@@ -2478,6 +2687,11 @@ def main() -> int:
     with ThreadPoolExecutor(max_workers=max_w) as ex:
         results = list(ex.map(_scan, raw))
     log.info("All %d domains scanned.", len(results))
+
+    try:
+        scorecard_enrich.warm_toolchain()
+    except Exception as exc:
+        log.warning("Scorecard toolchain warm-up error: %s", exc)
 
     matrix = [build_matrix_row(p) for p in results]
     payload = {

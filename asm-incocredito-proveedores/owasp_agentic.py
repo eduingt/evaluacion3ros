@@ -152,12 +152,24 @@ def evaluate_provider(p: dict[str, Any]) -> dict[str, Any]:
     # Determinar que hallazgos aplicar
     findings: list[tuple[str, list[str], float]] = []
 
-    h = (p.get("https") or {}).get("headers") or {}
-    tls = p.get("tls") or {}
-    dns = p.get("dns") or {}
+    h = {}
+    https_raw = p.get("https")
+    if isinstance(https_raw, dict):
+        inner = https_raw.get("headers")
+        if isinstance(inner, dict):
+            h = inner
+    https_headers_raw = p.get("https_headers") or {}
+    if isinstance(https_headers_raw, dict):
+        h = {**h, **https_headers_raw}
+    tls_raw = p.get("tls")
+    tls = tls_raw if isinstance(tls_raw, dict) else {}
+    dns_raw = p.get("dns")
+    dns = dns_raw if isinstance(dns_raw, dict) else {}
 
     # HTTPS
     https_code = p.get("https")
+    if isinstance(https_code, dict):
+        https_code = https_code.get("status")
     if not (isinstance(https_code, int) and 200 <= https_code < 400):
         findings.append(("https_missing", ASM_TO_OWASP_RULES[35][1], ASM_TO_OWASP_RULES[35][2]))
 

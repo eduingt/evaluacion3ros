@@ -1,0 +1,42 @@
+name: dast
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard_server.py"
+      - "static/**"
+      - "requirements-dashboard.txt"
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dashboard deps
+        run: pip install -r requirements-dashboard.txt -r requirements.txt
+      - name: Start dashboard (HTTP local)
+        run: |
+          nohup python dashboard_server.py --host 127.0.0.1 --port 8766 > zap_target.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8766/ && break
+            sleep 5
+          done
+          curl -sf http://localhost:8766/
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: "http://localhost:8766"
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: "zap_baseline"

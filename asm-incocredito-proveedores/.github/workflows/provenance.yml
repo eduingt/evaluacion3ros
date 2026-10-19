@@ -1,0 +1,29 @@
+name: provenance
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: sbom.spdx.json
+          artifact-name: sbom.spdx.json
+          # Sin subida a release assets para mantener contents: read.
+          # Para adjuntar el SBOM al release, poner upload-release-assets
+          # en true y subir contents a write solo en este job.
+          upload-release-assets: false
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: sbom.spdx.json

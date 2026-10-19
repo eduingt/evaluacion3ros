@@ -63,8 +63,8 @@ REPORT_CMD = {
         "generate_b2_scorecard_report.py",
         ["--asm", "{json}", "--out", "{html}", "--analista", "Equipo de Ciberseguridad", "--org", "Informe"],
     ),
-    "b3": (
-        "generate_b3_unified_report.py",
+    "b5": (
+        "generate_b5_unified_report.py",
         ["--asm", "{json}", "--out", "{html}", "--analista", "Equipo de Ciberseguridad", "--org", "Informe"],
     ),
     "pa": (
@@ -84,7 +84,7 @@ REPORT_FILES = {
     "scor3bank": "informe_scor3bank.html",
     "beta1": "informe_beta1.html",
     "b2": "informe_scorecard_b2.html",
-    "b3": "informe_unificado_b3.html",
+    "b5": "informe_unificado_b5.html",
     "pa": "informe_pasivo_activo.html",
     "ppasivo": "informe_ppasivo.html",
 }

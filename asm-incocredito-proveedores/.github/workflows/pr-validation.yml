@@ -1,0 +1,28 @@
+name: pr-validation
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install scan deps
+        run: pip install -r requirements.txt
+      - name: Compile core modules
+        run: |
+          python -m py_compile asm_scan.py dashboard_server.py external_sources.py pasivo_canon.py semi_canon.py vuln_lookup.py generate_dast_config.py generate_b5_unified_report.py generate_b6_unified_report.py generate_b7_unified_report.py generate_asm_passive_active_report.py generate_sarif_export.py generate_vex_export.py generate_sbom_export.py generate_openapi_export.py owasp_agentic.py owasp_web.py severity.py llm_guardrails.py prism_integration.py kumo_integration.py kumo_engine.py claude_osint_integration.py strix_integration.py scan_from_list.py ip_pivot.py
+      - name: Unit tests (stdlib unittest, sin deps extra)
+        run: python -m unittest discover -s tests
+      - name: Fuzz smoke (seeds, sin atheris)
+        run: python fuzz/fuzz_dast.py

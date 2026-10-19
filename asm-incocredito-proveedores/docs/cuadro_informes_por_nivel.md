@@ -105,6 +105,11 @@ generadores y los sets canónicos `pasivo_canon.py` / `semi_canon.py`.
 - **"Resultado (score numéricamente distinto...)" movido fuera de la matriz**: no es una dimensión cubierta, es
   una nota metodológica; ahora queda como `NOTA - Resultado:` debajo de la fila TOTAL y deja de contar en el total.
 
+### 3.3b Retiros 2026-10-13 (posteriores a esta validacion)
+- Columnas BC (`generate_bancolombia_report.py`), S3 y PP retiradas: generador ausente en disco,
+  endpoints dados de baja. La matriz de 8 columnas vivas mapea a TPRA/GC/B1/B2/B3-B6.
+  B4/B5/B6 comparten base con B3; B7 (SSC-style) y passive-active no estan en esta matriz.
+
 ### 3.3 Observaciones que conviene confirmar (no corregidas)
 - Hoja **Semi-activo**, fila "Score general": tras el fix queda SI en las 8 columnas (coherente con el código).
 - La fila "Superficie de ataque" + "Superficie ampliada" solapan parcialmente con las filas granulares

@@ -7,19 +7,20 @@ con estilo visual B2 (corporativo blanco/azul #173B67) y datos 100% reales.
 
 Basado en B3 (B6-v1.0 2026-09-24): cover, resumen, factor score,
 pasivo/activo, matriz de riesgo, hallazgos, recomendaciones RACI, anexos A-F.
-Sin dependencias rotas: no requiere salida_test/informe_unificado_b3.html
+Sin dependencias rotas: no requiere salida_test/informe_unificado_b6.html
 ni domain_score_legend. Todo se genera desde asm_report.json.
 """
 
 from __future__ import annotations
 import argparse
 import json
+import severity
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
+FORMULA_VERSION = "B6-v3.1"
 
-FORMULA_VERSION = "B6-v2.0"
-FORMULA_DATE = "2026-10-07"
+FORMULA_DATE = "2026-10-16"
 
 try:
     from score_legend import render_score_legend as _render_score_legend
@@ -42,57 +43,60 @@ try:
 except Exception:
     _B7MOD = None  # type: ignore
 
+try:
+    import oasm_enrich as _oasm
+except Exception:
+    _oasm = None  # type: ignore
+
+try:
+    import easyeasm_enrich as _eeasm
+except Exception:
+    _eeasm = None  # type: ignore
+
+try:
+    import scorecard_enrich as _sc
+except Exception:
+    _sc = None  # type: ignore
+
+try:
+    import origin_ip as _origin
+except Exception:
+    _origin = None  # type: ignore
+
+try:
+    import dns_extra as _dnsx
+except Exception:
+    _dnsx = None  # type: ignore
+
+try:
+    import hotlist as _hotlist
+except Exception:
+    _hotlist = None  # type: ignore
+
+try:
+    import xorcism_enrich as _xen
+except Exception:
+    _xen = None  # type: ignore
+
+try:
+    import rengine_enrich as _rng
+except Exception:
+    _rng = None  # type: ignore
+
+_B6_SSC = [
+    ("Seguridad de aplicacion web", "appsec"), ("Cubit Score", "cubit"),
+    ("Estado de DNS", "dns"), ("Seguridad de puntos de conexion", "endpoint"),
+    ("Hacker Chatter", "chatter"), ("Reputacion de IP", "iprep"),
+    ("Filtracion de informacion", "leak"), ("Seguridad de red", "network"),
+    ("Cadencia de aplicacion de revisiones", "patching"), ("Ingeniería social", "social"),
+]
+
 _SLA_B7 = {"ALTA": "P1 (0-7 días)", "MEDIA": "P2 (8-30 días)", "BAJA": "P3 (31-60 días)"}
 
 
-def _render_b7_vuln(p: dict, overall: int, domain: str, industry: str) -> str:
-    """Vulnerabilities Measure + Industry Comparison, valores dinámicos del escaneo."""
-    try:
-        open_ports = len([o for o in (p.get("open_ports") or []) if isinstance(o, dict) and o.get("state") == "open"])
-        site_vulns = len(p.get("vulnerabilities") or []) + len((p.get("nuclei") or {}).get("findings") or [])
-        malware = 1 if ((p.get("urlhaus") or {}).get("malicious") or (p.get("dns") or {}).get("ip_reputation")) else 0
-        try:
-            leaked = len([l for l in (p.get("credential_leaks") or []) if "error" not in l]) + len((((p.get("kumo") or {}).get("breachintel") or {}).get("summary", {}) or {}).get("breach_names", []) or [])
-        except Exception:
-            leaked = 0
-        try:
-            avg = int((_INDUSTRY_AVG or {}).get(industry, 88)) if industry and industry != "—" else 88
-        except Exception:
-            avg = 88
-        _disp = (domain.split(".")[0].title() + "." + ".".join(domain.split(".")[1:])) if "." in str(domain) else str(domain)
-        bw = max(0, min(100, int(overall))) * 1.6
-        aw = max(0, min(100, int(avg))) * 1.6
-        _ind = esc(industry) if industry and industry != "—" else "—"
-
-        def _card(val: int, lbl: str, alert: bool = False) -> str:
-            col = "#C62828" if (alert and val) else "#111827"
-            return (f'<div style="background:#fff; border-radius:8px; padding:10px; text-align:center;">'
-                    f'<div style="font-size:20px; font-weight:800; color:{col};">{val}</div>'
-                    f'<div style="font-size:7px; letter-spacing:.06em; color:#6B7280; text-transform:uppercase;">{lbl}</div></div>')
-
-        return (
-            '<div style="margin:0 16px 14px; background:#EEF1F5; border-radius:10px; padding:12px;">'
-            f'<div style="font-size:8px; font-weight:800; letter-spacing:.1em; color:#374151; text-transform:uppercase; text-align:center;">Vulnerabilities Measure -- {_ind.upper()}</div>'
-            '<div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin-top:10px;">'
-            f'{_card(open_ports, "Open Ports")}{_card(site_vulns, "Site Vulns")}{_card(malware, "Malware", True)}{_card(leaked, "Leaked Info", True)}'
-            "</div>"
-            '<div style="background:#fff; border-radius:8px; padding:12px 14px; margin-top:10px;">'
-            f'<div style="font-size:8px; font-weight:700; color:#111827;">Industry Comparison: {_ind}</div>'
-            f'<div style="display:flex; align-items:center; gap:8px; margin-top:8px;"><div style="flex:0 0 150px; font-size:7px; color:#4B6563;">{esc(_disp)} (you)</div><div style="flex:1;"><svg width="200" height="18" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="{bw:.0f}" height="18" rx="4" fill="#173B67"/></svg></div><div style="font-size:8px; font-weight:800; color:#111827;">{int(overall)}</div></div>'
-            f'<div style="display:flex; align-items:center; gap:8px; margin-top:6px;"><div style="flex:0 0 150px; font-size:7px; color:#4B6563;">Industry average ({_ind})</div><div style="flex:1;"><svg width="200" height="18" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="{aw:.0f}" height="18" rx="4" fill="#9CA3AF"/></svg></div><div style="font-size:8px; font-weight:800; color:#111827;">{avg}</div></div>'
-            "</div>"
-            "</div>"
-        )
-    except Exception:
-        return ""
-
-
 def _render_b7_calcbox(scores: dict, overall: int, domain: str) -> str:
-    """¿Cómo se calcula el Overall Score? Promedio ponderado con caso real del dominio."""
+    """¿Cómo se calcula el Overall Score? Promedio simple con caso real del dominio (SSC v3.0, sin pesos)."""
     try:
-        _W = {"network": 1.2, "dns": 1.2, "patching": 1.2, "endpoint": 1.0,
-              "iprep": 1.2, "appsec": 1.2, "cubit": 0.8, "chatter": 0.8,
-              "leak": 1.0, "social": 0.9}
         _BI = {"appsec": ("Seguridad de aplicación web", "Application security"),
                "cubit": ("Cubit Score", "Cubit score"),
                "dns": ("Salud de DNS", "DNS health"),
@@ -107,12 +111,12 @@ def _render_b7_calcbox(scores: dict, overall: int, domain: str) -> str:
         ex = []
         for k, s in ranked[:2]:
             _es, _en = _BI.get(k, (k, k))
-            ex.append(f"{_es}/{_en} {s} (x{_W.get(k, 1.0):g})")
+            ex.append(f"{_es}/{_en} {s}")
         _disp = (domain.split(".")[0].title() + "." + ".".join(domain.split(".")[1:])) if "." in str(domain) else str(domain)
-        example = f"Detalle {_disp}: " + " + ".join(ex) + f" ... = {int(overall)} (promedio ponderado de 10 factores)." if ex else ""
+        example = f"Detalle {_disp}: " + " + ".join(ex) + f" ... = {int(overall)} (promedio simple de 10 factores)." if ex else ""
         return (
             '<div style="margin:0 16px 14px; background:#fff; border:1px solid #D9DEE3; border-left:4px solid #2F6F9F; border-radius:6px; padding:12px 14px; font-size:9pt; color:#374151; line-height:1.65;">'
-            "<strong>¿Cómo se calcula el Overall Score?</strong> Promedio <strong>ponderado</strong> de 10 factores: cada score se multiplica por su peso (Network/DNS/Patching/IPRep/AppSec <strong>×1.2</strong>, resto ×1.0/×0.9/×0.8) y se divide por la suma de pesos. "
+            "<strong>¿Cómo se calcula el Overall Score?</strong> Promedio <strong>simple</strong> de 10 factores, sin pesos por factor (metodología SSC v3.0). "
             + esc(example) + " Validado: <strong>100</strong> = todos los factores en 100. "
             'Colores: <span style="color:#2E7D32;">■</span> ≥90 verde, <span style="color:#F9A825;">■</span> 70-89 amarillo, <span style="color:#EF6C00;">■</span> 60-69 naranja, <span style="color:#C62828;">■</span> &lt;60 rojo. '
             "</div>"
@@ -122,26 +126,39 @@ def _render_b7_calcbox(scores: dict, overall: int, domain: str) -> str:
 
 
 def _bid(html: str, sec_id: str) -> str:
-    """Anade id de ancla B7 al primer <div class="pb"> del bloque."""
-    return html.replace('<div class="pb">', f'<div class="pb" id="{sec_id}">', 1)
+    """Anade id de ancla B7 al primer <div class="pb"> del bloque (con o sin atributos)."""
+    if f'id="{sec_id}"' in html:
+        return html
+    return html.replace('<div class="pb"', f'<div class="pb" id="{sec_id}"', 1)
 
 
 def _render_b7_audit(by_factor: dict, scores: dict, overall: int, domain: str = "", industry: str = "", p: dict | None = None) -> str:
     """Trazabilidad B7: base precia + impactos decimales = score; contribucion verifica Overall."""
     try:
         _names = {k: n for k, n, _ in (_B7MOD.SSC_FACTORS if _B7MOD else [])}
-        _W = {"network": 1.2, "dns": 1.2, "patching": 1.2, "endpoint": 1.0,
-              "iprep": 1.2, "appsec": 1.2, "cubit": 0.8, "chatter": 0.8,
-              "leak": 1.0, "social": 0.9}
         _keys = [k for k, _, _ in (_B7MOD.SSC_FACTORS if _B7MOD else [])]
-        total_w = sum(_W.get(k, 1.0) for k in _keys)
         rows = []
+        _sum_contrib = 0.0
+        try:
+            _audit_cards = build_findings(p) if p else []
+        except Exception:
+            _audit_cards = []
+
+        def _n_cards(key: str) -> int:
+            cats = _FACTOR_FINDING_CATS.get(key, [])
+            n = 0
+            for f in _audit_cards:
+                t = _norm(str(f.get("titulo", "")) + " " + str(f.get("categoria", "")))
+                if any(c in t for c in cats):
+                    n += 1
+            return n
+
         for key in _keys:
             items = (by_factor or {}).get(key, [])
             imps = [float(i.get("impact", 0) or 0) for i in items]
             s = int((scores or {}).get(key, 0))
-            w = _W.get(key, 1.0)
-            contrib = round(s * w / total_w, 2) if total_w else 0.0
+            contrib = round(s / 10.0, 2)
+            _sum_contrib += contrib
             det = ("Sin impactos" if not imps else
                    " + ".join(f"{v:g}" for v in imps[:4]) + (f" (+{len(imps) - 4} más)" if len(imps) > 4 else ""))
             _det_items = items[:4] + ([None] if len(items) > 4 else [])
@@ -151,42 +168,46 @@ def _render_b7_audit(by_factor: dict, scores: dict, overall: int, domain: str = 
                 for _it in _det_items))
             rows.append(
                 f"<tr><td>{esc(_names.get(key, key))}</td><td class='num'>{s}</td>"
-                f"<td class='num'>×{w:g}</td><td class='num'>{contrib:.2f}</td>"
+                f"<td class='num'>{contrib:.2f}</td>"
                 f"<td style='font-size:7pt;'>{esc(det)}</td>"
                 f"<td style='font-size:7pt;'>{_desglose}</td>"
-                f"<td class='num'>{len(items)}</td></tr>")
+                f"<td class='num'>{len(items)}</td>"
+                f"<td class='num'>{_n_cards(key)}</td></tr>")
         _tot_iss = sum(len((by_factor or {}).get(k, [])) for k in _keys)
+        _tot_cards = len(_audit_cards)
         rows.append(
             f"<tr style='background:#EEF1F5; font-weight:800;'><td>TOTAL</td>"
-            f"<td class='num'>—</td><td class='num'>Σ={total_w:.1f}</td>"
             f"<td class='num'>{overall}</td>"
-            f"<td style='font-size:6pt; color:#6B7280;'>ΣContrib=Overall</td>"
+            f"<td class='num'>{_sum_contrib:.2f}</td>"
+            f"<td style='font-size:6pt; color:#6B7280;'>ΣContrib≈Overall</td>"
             f"<td style='font-size:6pt; color:#6B7280;'>—</td>"
-            f"<td class='num'>{_tot_iss}</td></tr>")
+            f"<td class='num'>{_tot_iss}</td>"
+            f"<td class='num'>{_tot_cards}</td></tr>")
         return (
             '<div class="pb" id="sec-b7audit">'
             '<h2 class="sec">Puntuación Global — Desglose Auditable</h2>'
-            '<p style="font-size:9pt;">Cada factor parte de su <b>base precia</b>, suma sus '
-            '<b>impactos decimales</b> y pondera por <b>peso</b>; la suma de contribuciones '
-            'reproduce el Overall. Sin impactos, el score es la base.</p>'
-            '<table class="act"><thead><tr><th style="width:22%;">Factor</th>'
-            '<th style="width:8%;">Score</th><th style="width:7%;">Peso</th>'
+            '<p style="font-size:9pt;">Cada factor parte de su <b>base precia</b> y suma sus '
+            '<b>impactos decimales</b>; el Overall es el <b>promedio simple</b> de los 10 factores '
+            '(sin pesos por factor, metodología SSC v3.0). Sin impactos, el score es la base.</p>'
+            '<table class="act"><thead><tr><th style="width:20%;">Factor</th>'
+            '<th style="width:8%;">Score</th>'
             '<th style="width:11%;">Contribución</th><th>Impactos decimales</th>'
             '<th>Desglose auditable</th>'
-            '<th style="width:8%;">Issues</th></tr></thead>'
+            '<th style="width:8%;">Incidencias</th>'
+            '<th style="width:8%;">Hallazgos</th></tr></thead>'
             f"<tbody>{''.join(rows)}</tbody></table>"
-            f"<p style='font-size:7pt; color:#6B7280;'>ΣContribuciones = {overall} · "
-            f"ΣPesos={total_w:.1f} · Formula {FORMULA_VERSION} reproducible.</p>"
+            f"<p style='font-size:7pt; color:#6B7280;'>ΣContribuciones = {_sum_contrib:.2f} ≈ {overall} · "
+            f"Formula {FORMULA_VERSION} reproducible. Hallazgos por factor cuenta tarjetas con multiplicidad "
+            f"(una tarjeta puede aplicar a varios factores); Incidencias cuenta issues B7.</p>"
             f"<div style='margin:0 0 12px; background:#fff; border:1px solid #D9DEE3; border-radius:8px; overflow:hidden;'>"
             f"<table class='data' style='font-size:7pt; margin:0; border-collapse:collapse;'><thead>"
             f"<tr style='background:#1A3A4A; color:#fff;'><th style='background:#1A3A4A; color:#fff; text-align:left; padding:8px 10px; font-size:7.5pt;'><span style='display:inline-block; background:#fff; color:#1A3A4A; border-radius:50%; width:22px; height:22px; line-height:22px; text-align:center; font-weight:800; font-size:9pt; margin-right:6px;'>≡</span> Grupo Cibest</th><th colspan='4' style='background:#1A3A4A; color:#fff; text-align:center; font-size:9pt; letter-spacing:.04em;'>Nivel de Madurez SIyCS</th></tr>"
             f"<tr style='background:#1A3A4A; color:#fff;'><th style='background:#2A4A5A; color:#fff; padding:6px 8px;'>Escenario Valoración SIyCS</th><th colspan='3' style='background:#2A4A5A; color:#fff; padding:6px 8px; text-align:center;'>Porcentaje Hallazgos SIyCS</th><th style='background:#2A4A5A; color:#fff; padding:6px 8px; text-align:center;'>Total Hallazgos SIyCS</th></tr>"
             f"<tr style='background:#1A3A4A; color:#fff;'><th style='background:#2A4A5A; color:#fff; padding:5px 8px;'></th><th style='background:#3A5A6A; color:#fff; padding:5px 8px; text-align:center; font-weight:600;'>Entrevista</th><th style='background:#3A5A6A; color:#fff; padding:5px 8px; text-align:center; font-weight:600;'>Scorecard</th><th style='background:#3A5A6A; color:#fff; padding:5px 8px; text-align:center; font-weight:600;'>Análisis Certificación</th><th style='background:#2A4A5A; color:#fff; padding:5px 8px;'></th></tr>"
             f"</thead><tbody><tr><td class='num' style='font-weight:800;'>{len(_keys)}</td><td class='num'>N/A</td><td class='num' style='font-weight:800;'>{overall}%</td><td class='num'></td><td class='num' style='font-weight:800;'>{sum(len((by_factor or {}).get(k, [])) for k in _keys)}</td></tr></tbody></table>"
-            f"<div style='font-size:6px; color:#6B7280; padding:6px 10px; background:#F9FAFB; border-top:1px solid #D9DEE3;'>Escenario = nº factores de riesgo ({len(_keys)}) · Scorecard = Puntuación Global (Overall {overall}/100) · Total = ΣIncidencias Overall (ver desglose sección 4)</div>"
+            f"<div style='font-size:6px; color:#6B7280; padding:6px 10px; background:#F9FAFB; border-top:1px solid #D9DEE3;'>Escenario = nº factores de riesgo ({len(_keys)}) · Scorecard = Puntuación Global (Overall {overall}/100) · Total = ΣIncidencias Overall (ver desglose en la sección 4.1)</div>"
             f"</div>"
             f"{_render_b7_radar(scores, domain, industry)}"
-            f"{_render_b7_vuln(p or {}, overall, domain, industry)}"
             f"{_render_b7_calcbox(scores, overall, domain)}"
             "</div>"
         )
@@ -227,7 +248,7 @@ def _render_b7_radar(scores: dict, domain: str, industry: str) -> str:
             f'<div style="margin-bottom:4px;"><span style="width:14px; height:0; border-top:2.5px solid #173B67; display:inline-block; vertical-align:middle;"></span> Solido azul = Tu ({esc(domain)})</div>'
             f'<div style="margin-bottom:4px;"><span style="width:14px; height:0; border-top:1.5px dashed #9CA3AF; display:inline-block; vertical-align:middle;"></span> Discontinua gris = Industria ({_ind_txt})</div>'
             '<div><span style="width:10px; height:10px; border:1px solid #D1D5DB; border-radius:50%; display:inline-block;"></span> Anillo ext. = 100</div>'
-            '<div style="margin-top:6px; font-size:5.5px; color:#6B7280; line-height:1.3; font-style:italic;">Valores &lt;70 en amarillo/rojo requieren plan. Ponderacion: Network/DNS/Patching/IPRep/AppSec x1.2</div>'
+            '<div style="margin-top:6px; font-size:5.5px; color:#6B7280; line-height:1.3; font-style:italic;">Valores &lt;70 en amarillo/rojo requieren plan. Sin pesos por factor (SSC v3.0).</div>'
             '</div>'
             '</div>'
             f'<div style="margin-top:4px; font-size:6px; color:#6B7280; text-align:center;">Tu ({esc(domain)}) ---- Industria {esc(industry)}</div>'
@@ -410,9 +431,9 @@ def precia_deductions(p: dict[str, Any]) -> dict[str, list[tuple[str, int]]]:
     if not (headers.get("content-security-policy") or headers.get("content-security-policy-report-only")):
         ap.append(("Sin CSP", -20))
     elif csp_f:
-        crit = sum(1 for f in csp_f if isinstance(f, dict) and f.get("severity") == "high")
+        crit = sum(1 for f in csp_f if isinstance(f, dict) and severity.normalize(f.get("severity")) == "high")
         ap.append(("CSP debil", -15 if crit else -7))
-    if any(isinstance(f, dict) and f.get("severity") == "high" for f in cookie_f):
+    if any(isinstance(f, dict) and severity.normalize(f.get("severity")) == "high" for f in cookie_f):
         ap.append(("Cookies high", -15))
     elif cookie_f:
         ap.append(("Cookies", -7))
@@ -539,11 +560,11 @@ def render_asset_inventory(providers: list[dict[str, Any]]) -> str:
         third_display = ", ".join(f"{d} (shared)" if d in shared_set else d for d in third_doms[:3])[:60]
         rows += f"<tr><td>{esc(dom)}</td><td class='num'>{len(first_ips)}</td><td class='num'>{len(first_subs)}</td><td>{esc(third_display) or '—'}</td><td class='num'>{len(third_doms)}</td><td class='num' style='color:{'#C62828' if exposed else '#2E7D32'}; font-weight:700;'>{exposed}</td></tr>"
     return (
-        '<div class="section-sub" id="sec-inventario">10.1 Inventario de Activos (First-party vs Third-party)</div>'
+        '<div class="section-sub" id="sec-inventario">7.1 Inventario de Activos (First-party vs Third-party)</div>'
         '<div class="info-box">First-party = infraestructura propia/origen (IPs del dominio, subdominios del apex). Third-party = dependencias/CDN compartidas (como Cloudflare, jsDelivr, recaptcha) — <span style="color:#2E7D32;">shared = contextual</span>, no riesgo directo. Third-party dedicated = riesgo directo. Exposición = puertos abiertos + CVEs observados (HIGH si >0 en first-party).</div>'
         '<table class="data"><thead><tr><th>Proveedor</th><th>IPs propias</th><th>Subdominios</th><th>Terceros (ej.)</th><th>#Terceros</th><th>Exposición</th></tr></thead>'
         f"<tbody>{rows or '<tr><td colspan=6>Sin activos</td></tr>'}</tbody></table>"
-        f"<div style='font-size:7pt; color:#6B7280;'>Totales: First-party {total_first} activos · Third-party {total_third} dependencias · Expuestos {total_exposed} (puertos+CVEs) · Exposición HIGH si >0 en first-party.</div>"
+        f"<div style='font-size:7pt; color:#6B7280;'>Totales: First-party {total_first} observados (nombres CT/DNS + IPs) · Third-party {total_third} dependencias · Expuestos {total_exposed} (puertos no-80/443 + CVEs; 80/443 se evalúan en HTTPS/TLS) · Exposición HIGH si >0 en first-party.</div>"
     )
 
 
@@ -559,6 +580,7 @@ _DISP_CAT = {
     "VULNERABILIDADES": "VULNERABILIDADES",
     "CADENCIA DE REVISIONES": "CADENCIA DE REVISIONES",
     "REPUTACION DE TERCEROS": "REPUTACIÓN DE TERCEROS",
+    "REPUTACION DE IP": "REPUTACIÓN DE IP",
     "OSINT PASIVO": "OSINT PASIVO",
     "OSINT SEMI-ACTIVO": "OSINT SEMI-ACTIVO",
     "EXPOSICION DE IDENTIDAD": "EXPOSICIÓN DE IDENTIDAD",
@@ -574,7 +596,7 @@ _DISP_FACTOR = {
     "Filtracion de informacion": "Filtración de información",
     "Seguridad de red": "Seguridad de red",
     "Cadencia de aplicacion de revisiones": "Cadencia de aplicación de revisiones",
-    "Ingenieria social": "Ingeniería social",
+    "Ingeniería social": "Ingeniería social",
 }
 
 
@@ -642,8 +664,56 @@ def _lbl_matches_finding(lbl: str, f: dict[str, Any]) -> bool:
     return False
 
 
+def _ssc_threat_level(f: dict[str, Any]) -> str:
+    """Threat Level oficial SSC ed. 021026 por tipo de issue (HIGH/MEDIUM/LOW/INFO). '—' = sin equivalente directo."""
+    t = _norm(str(f.get("titulo", "")) + " " + str(f.get("rule", "")) + " " + str(f.get("categoria", "")))
+    if "SRI" in t or "SUBRESOURCE" in t or ("INTEGRIDAD" in t and "RECURSOS" in t):
+        return "HIGH"
+    if "HSTS" in t:
+        return "MEDIUM"
+    if "CSP" in t:
+        if "AUSENTE" in t or "MISSING" in t:
+            return "MEDIUM"
+        return "LOW"
+    if "XCTO" in t or "NOSNIFF" in t or "MIME" in t or "CONTENT-TYPE" in t:
+        return "LOW"
+    if "XFO" in t or "FRAME-ANCESTORS" in t or "CLICKJACKING" in t or "X-FRAME" in t:
+        return "LOW"
+    if "COOKIE" in t:
+        return "LOW"
+    if "SPOOFABLE" in t or "SPF" in t and ("DEBIL" in t or "~ALL" in t or "INEFECTIV" in t):
+        return "LOW"
+    if "SPF" in t or "DMARC" in t or "DKIM" in t:
+        return "INFO"
+    if "TYPO" in t or "LOOKALIKE" in t:
+        return "INFO"
+    if "DNSBL" in t or "REPUTACION" in t or "TERCEROS LISTADOS" in t or "IP " in t and "LISTADA" in t:
+        return "INFO"
+    if "URLHAUS" in t or "MALICIOS" in t:
+        return "INFO"
+    if "STARTTLS" in t or "TLS-RPT" in t or "TLSA" in t or "MTA" in t:
+        return "—"
+    if "TLS" in t or "CIPHER" in t or "CIFRADO" in t or "PROTOCOLO" in t:
+        return "MEDIUM"
+    if "EOL" in t or "CVE" in t or "VULN" in t or "OSV" in t or "KEV" in t:
+        return "HIGH"
+    if "CREDENCIAL" in t or "BREACH" in t or "LEAK" in t or "FILTRACION" in t or "FILTRA" in t:
+        return "LOW"
+    if "SECRETOS" in t or "WAYBACK" in t or "JAVASCRIPT" in t or "JS " in t:
+        return "INFO"
+    if "REDIRECT" in t and "HTTP" in t:
+        return "MEDIUM"
+    if "FTP" in t or "TELNET" in t:
+        return "LOW"
+    if "RDP" in t or "SMB" in t or "VNC" in t or "SSH" in t or "PUERTO" in t or "PORT" in t or "MYSQL" in t or "MSSQL" in t or "POSTGRES" in t or "MONGO" in t or "REDIS" in t:
+        return "MEDIUM"
+    if "BANNER" in t or "SERVER" in t or "X-POWERED" in t or "ERROR" in t:
+        return "INFO"
+    return "—"
+
+
 def _finding_refs(key: str, findings: list[dict[str, Any]] | None, labels: list[str] | None = None, cats: list[str] | None = None) -> str:
-    """Numeros de hallazgos sección 12 que REALMENTE deducen al factor (misma familia de control) — clickeable a #hallazgo-N."""
+    """Numeros de hallazgos sección 10 que REALMENTE deducen al factor (misma familia de control) — clickeable a #hallazgo-N."""
     if not findings:
         return "—"
     labels = labels or []
@@ -673,7 +743,6 @@ def render_traceability_table(all_findings: list[dict[str, Any]], providers: lis
         except Exception:
             _ded_overall = {}
         rows = ""
-        _total_w = sum(_PRECIA_WEIGHTS.get(k, 1.0) for k in scores) if scores else 10.5
         _audit_overall = []
         _score_before = 100.0
         for f in all_findings:
@@ -717,34 +786,29 @@ def render_traceability_table(all_findings: list[dict[str, Any]], providers: lis
                             break
                     if ded_overall:
                         break
-            weight = 1.0
-            for fk in _ded_overall:
-                if any(c in _norm(f.get("categoria","")) for c in _FACTOR_FINDING_CATS.get(fk, [])):
-                    weight = _PRECIA_WEIGHTS.get(fk, 1.0)
-                    break
             if not ded_label:
                 ded_overall = 0
-            contrib = round((ded_overall * weight / _total_w) if _total_w else 0, 2) if ded_overall else 0.0
+            contrib = round(ded_overall / 10.0, 2) if ded_overall else 0.0
             _score_after = round(max(0, _score_before + contrib), 2)
             _audit_overall.append((_score_before, fid, contrib, _score_after))
             _score_before = _score_after
             ownership = "first-party" if dom == p0.get("domain","") else "third-party/shared" if "TERCEROS" in cat.upper() else "first-party"
             evid = esc(str(f.get("evidencia",""))[:60].replace(chr(10)," "))
-            rows += f"<tr><td style='font-size:6.5pt; white-space:nowrap;'>{fid}</td><td style='font-size:6.5pt;'>{rule}</td><td style='font-size:6.5pt;'>{cat}</td><td style='font-size:6.5pt;'>{ded_label or '—'}</td><td class='num' style='font-size:6.5pt;'>{ded_overall if ded_overall else '—'}</td><td class='num' style='font-size:6.5pt;'>×{weight:g}</td><td class='num' style='font-size:6.5pt;'>{contrib:.2f}</td><td style='font-size:6.5pt;'>{evid}</td><td class='num' style='font-size:6.5pt;'>{dom[:12]}</td><td style='font-size:6.5pt;'>{ownership}</td><td style='font-size:6.5pt;'>{conf}</td><td style='font-size:6.5pt;'>{sev}</td><td style='font-size:6.5pt;'>{prio}</td></tr>"
+            rows += f"<tr><td style='font-size:6.5pt; white-space:nowrap;'>{fid}</td><td style='font-size:6.5pt;'>{rule}</td><td style='font-size:6.5pt;'>{cat}</td><td style='font-size:6.5pt;'>{ded_label or '—'}</td><td class='num' style='font-size:6.5pt;'>{ded_overall if ded_overall else '—'}</td><td class='num' style='font-size:6.5pt;'>{contrib:.2f}</td><td style='font-size:6.5pt;'>{evid}</td><td class='num' style='font-size:6.5pt;'>{dom[:12]}</td><td style='font-size:6.5pt;'>{ownership}</td><td style='font-size:6.5pt;'>{conf}</td><td style='font-size:6.5pt;'>{sev}</td><td style='font-size:6.5pt;'>{prio}</td></tr>"
         audit_rows = ""
         for before, fid, ded, after in _audit_overall[:12]:
             audit_rows += f"<tr><td class='num' style='font-size:6.5pt;'>{before:.1f}</td><td style='font-size:6.5pt;'>{fid}</td><td class='num' style='font-size:6.5pt;'>{ded}</td><td class='num' style='font-size:6.5pt; font-weight:700;'>{after:.1f}</td></tr>"
         if not rows:
-            rows = "<tr><td colspan='13' style='text-align:center; font-size:7pt; color:#6B7280;'>Sin hallazgos para trazabilidad</td></tr>"
+            rows = "<tr><td colspan='12' style='text-align:center; font-size:7pt; color:#6B7280;'>Sin hallazgos para trazabilidad</td></tr>"
         if not audit_rows:
             audit_rows = "<tr><td colspan='4' style='text-align:center; font-size:7pt; color:#6B7280;'>Sin auditoría</td></tr>"
         return (
-            '<div class="section-sub" style="page-break-before:always;">Trazabilidad hallazgo → regla → deducción → factor → peso → contribución</div>'
-            '<div class="info-box" style="font-size:7.5pt;">Cada fila muestra la cadena completa: <strong>hallazgo</strong> (ID estable) → <strong>regla</strong> (ej. CSP-BASE-URI-MISSING) → <strong>factor</strong> (Overall) → <strong>deducción</strong> (puntos) → <strong>peso</strong> (×1.2) → <strong>contribución</strong> (deducción×peso/ΣPesos). HSTS en Network y Cubit es <em>intencional</em>: son controles independientes con pesos distintos, documentado aquí para evitar doble conteo percibido.</div>'
-            '<div style="overflow-x:auto;"><table class="data" style="font-size:6.5pt;"><thead><tr><th>Finding ID</th><th>Rule ID</th><th>Categoría</th><th>Deducción</th><th>Puntos</th><th>Peso</th><th>Contrib.</th><th>Evidencia</th><th>Asset</th><th>Ownership</th><th>Conf.</th><th>Sev.</th><th>Prio</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+            '<div class="section-sub" style="page-break-before:always;">Trazabilidad hallazgo → regla → deducción → factor → contribución</div>'
+            '<div class="info-box" style="font-size:7.5pt;">Cada fila muestra la cadena completa: <strong>hallazgo</strong> (ID estable) → <strong>regla</strong> (ej. CSP-BASE-URI-MISSING) → <strong>factor</strong> (Factor Score) → <strong>deducción</strong> (puntos) → <strong>contribución</strong> (deducción/10, sin pesos por factor). HSTS en Network y Cubit es <em>intencional</em>: son controles independientes, documentado aquí para evitar doble conteo percibido.</div>'
+            '<div style="overflow-x:auto;"><table class="data" style="font-size:6.5pt;"><thead><tr><th>Finding ID</th><th>Rule ID</th><th>Categoría</th><th>Deducción</th><th>Puntos</th><th>Contrib.</th><th>Evidencia</th><th>Asset</th><th>Ownership</th><th>Conf.</th><th>Sev.</th><th>Prio</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
             '<div class="section-sub" style="margin-top:12px;">Auditoría Overall — score_before → finding → score_after (reproducible)</div>'
-            '<div class="info-box" style="font-size:7.5pt;">Ejemplo reproducible: Overall inicia 100 y cada hallazgo resta su deducción ponderada. ΣPesos=10.5. Esta tabla permite re-ejecutar el cálculo y verificar que no hay hallazgo sin deducción ni deducción sin hallazgo.</div>'
-            '<table class="data" style="font-size:7pt;"><thead><tr><th>Score_before</th><th>Finding ID</th><th>Contribución</th><th>Score_after</th></tr></thead><tbody>' + audit_rows + f'</tbody></table><div style="font-size:6px; color:#6B7280; margin-top:4px;">ΣContribuciones ponderadas = {100-overall:.1f} → 100 - {100-overall:.1f} = {overall} · Fórmula B6-v1.0 reproducible</div>'
+            '<div class="info-box" style="font-size:7.5pt;">Ejemplo reproducible: Factor Score inicia 100 y cada hallazgo resta su deducción entre 10 factores. Esta tabla permite re-ejecutar el cálculo y verificar que no hay hallazgo sin deducción ni deducción sin hallazgo.</div>'
+            '<table class="data" style="font-size:7pt;"><thead><tr><th>Score_before</th><th>Finding ID</th><th>Contribución</th><th>Score_after</th></tr></thead><tbody>' + audit_rows + f'</tbody></table><div style="font-size:6px; color:#6B7280; margin-top:4px;">ΣContribuciones = {100-score_general:.1f} → 100 - {100-score_general:.1f} = {score_general} · Fórmula {FORMULA_VERSION} reproducible (audita Factor Score; el Overall se audita en la sección 4.1)</div>'
         )
     except Exception as e:
         return f"<div class='info-box' style='font-size:7pt; color:#6B7280;'>Trazabilidad no disponible: {esc(str(e))}</div>"
@@ -781,7 +845,13 @@ body { font-family:'Arial','Helvetica',sans-serif; font-size:10pt; color:#1F2933
 .cover-meta td { padding:7px 12px; border-bottom:1px solid #D9DEE3; }
 .cover-meta td:first-child { font-weight:700; color:#173B67; width:200px; }
 .cover-footer { border-top:3px solid #173B67; padding:12px 60px 0; font-size:7pt; color:#6B7280; display:flex; justify-content:space-between; }
-.sec { padding:30px 50px; page-break-inside:avoid; }
+.sec { padding:30px 50px; page-break-inside:auto; }
+.section-title, h2.sec, h3.mod, .mod-head, .section-sub, .section-sub2, h4, h5 { page-break-after:avoid; break-after:avoid; }
+table.data, table.ev, table.act, thead { page-break-inside:avoid; break-inside:avoid; }
+thead { display:table-header-group; }
+tr, li { page-break-inside:avoid; break-inside:avoid; }
+.find-card, .issue, .sevbox, .kpi-row, .gauge-wrap, .factors, .twocol, .evidence-box, .info-box, .nodata { page-break-inside:avoid; break-inside:avoid; }
+.toc-row { page-break-inside:avoid; break-inside:avoid; }
 .section-title { font-size:18pt; font-weight:700; color:#173B67; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #173B67; }
 .section-sub { font-size:13pt; font-weight:600; color:#2F6F9F; margin:16px 0 10px; }
 .section-sub2 { font-size:11pt; font-weight:600; color:#173B67; margin:12px 0 6px; }
@@ -856,6 +926,9 @@ h4 { font-size:10pt; color:#173B67; margin:12px 0 4px; padding-bottom:3px; borde
 .toc-sub { padding-left:46px; }
 .toc-sub .toc-num { color:#6B7280; font-weight:600; font-size:9pt; flex-basis:40px; }
 .toc-sub .toc-title { color:#4B6563; font-size:9pt; }
+/* Alineación visual sección 4 con el resto del documento (sobrescribe CSS B7) */
+#sec-b7ov h2.sec, #sec-b7audit h2.sec, #sec-b7accion h2.sec, div.pb h2.sec { color:#173B67; }
+#sec-b7ov h3.mod, div.pb h3.mod { color:#173B67; font-weight:700; }
 @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
 """
 
@@ -912,7 +985,7 @@ def domain_score(p: dict[str, Any]) -> float:
         pts -= 4
     elif p.get("csp_findings"):
         csp_f = p.get("csp_findings") or []
-        if any(f.get("severity") == "high" for f in csp_f):
+        if any(severity.normalize(f.get("severity")) == "high" for f in csp_f):
             pts -= 3
         elif csp_f:
             pts -= 2
@@ -965,7 +1038,7 @@ def domain_score(p: dict[str, Any]) -> float:
     elif len(takeover) >= 1:
         pts -= 2
     cookie_f = p.get("cookie_findings") or []
-    if any(f.get("severity") == "high" for f in cookie_f):
+    if any(severity.normalize(f.get("severity")) == "high" for f in cookie_f):
         pts -= 3
     elif cookie_f:
         pts -= 1
@@ -991,7 +1064,7 @@ def domain_deductions(p: dict[str, Any]) -> list[tuple[str, int]]:
         out.append(("CSP ausente", -4))
     elif p.get("csp_findings"):
         csp_f = p.get("csp_findings") or []
-        out.append(("CSP debil", -3 if any(f.get("severity") == "high" for f in csp_f) else -2))
+        out.append(("CSP debil", -3 if any(severity.normalize(f.get("severity")) == "high" for f in csp_f) else -2))
     if not headers.get("x-frame-options"):
         out.append(("X-Frame-Options", -2))
     if not headers.get("x-content-type-options"):
@@ -1036,7 +1109,7 @@ def domain_deductions(p: dict[str, Any]) -> list[tuple[str, int]]:
     elif len(takeover) >= 1:
         out.append(("Takeover potencial", -2))
     cookie_f = p.get("cookie_findings") or []
-    if any(f.get("severity") == "high" for f in cookie_f):
+    if any(severity.normalize(f.get("severity")) == "high" for f in cookie_f):
         out.append(("Cookies high", -3))
     elif cookie_f:
         out.append(("Cookies low", -1))
@@ -1112,7 +1185,7 @@ def compute_factores(providers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         (lambda p: sum(1 for x in (p.get("patching") or []) if x.get("status") == "eol") > 0, 12),
         (lambda p: len(p.get("vulnerabilities") or []) > 0, 8),
     ]))
-    factores.append(_factor(providers, "Ingenieria social", 100, [
+    factores.append(_factor(providers, "Ingeniería social", 100, [
         (lambda p: len(p.get("typosquatting") or []) > 0, 5),
     ]))
     return factores
@@ -1128,7 +1201,7 @@ _B3_FACTOR_CATS = {
     "Filtracion de informacion": ["FILTRACION", "LEAK"],
     "Seguridad de red": ["SEGURIDAD DE RED"],
     "Cadencia de aplicacion de revisiones": ["CADENCIA", "VULNERABILIDADES", "REVISIONES"],
-    "Ingenieria social": ["INGENIERIA", "SOCIAL"],
+    "Ingeniería social": ["INGENIERIA", "SOCIAL"],
 }
 
 
@@ -1191,7 +1264,7 @@ def b3_deductions(providers: list[dict[str, Any]]) -> dict[str, list[tuple[str, 
         (lambda p: sum(1 for x in (p.get("patching") or []) if isinstance(x, dict) and x.get("status") == "eol") > 0, 12, "EOL"),
         (lambda p: len(p.get("vulnerabilities") or []) > 0, 8, lambda p: f"Vulns ({len(p.get('vulnerabilities') or [])})"),
     ])
-    out["Ingenieria social"] = _collect([
+    out["Ingeniería social"] = _collect([
         (lambda p: len(p.get("typosquatting") or []) > 0, 5, lambda p: f"Typos ({len(p.get('typosquatting') or [])})"),
     ])
     return out
@@ -1258,7 +1331,7 @@ def _mueve_a(f: dict[str, Any]) -> str:
 def _stable_id(cat: str, titulo: str) -> str:
     import hashlib
     h = hashlib.md5(f"{cat}|{titulo}".encode("utf-8")).hexdigest()[:6].upper()
-    prefix = {"ESTADO DE DNS": "DNS", "CONFIGURACIÓN DE CORREO": "MAIL", "SEGURIDAD DE APLICACIÓN WEB": "WEB", "SEGURIDAD DE ENDPOINTS": "ENDP", "INGENIERÍA SOCIAL": "SOC", "SEGURIDAD DE RED": "NET", "REPUTACIÓN DE TERCEROS": "SUPPLY", "FILTRACIÓN DE INFORMACIÓN": "LEAK", "OSINT PASIVO": "OSINT", "SUPERFICIE DE ATAQUE": "SURF"}.get(cat, cat[:4].upper())
+    prefix = {"ESTADO DE DNS": "DNS", "CONFIGURACIÓN DE CORREO": "MAIL", "SEGURIDAD DE APLICACIÓN WEB": "WEB", "SEGURIDAD DE ENDPOINTS": "ENDP", "INGENIERÍA SOCIAL": "SOC", "SEGURIDAD DE RED": "NET", "REPUTACIÓN DE TERCEROS": "SUPPLY", "REPUTACIÓN DE IP": "IPREP", "FILTRACIÓN DE INFORMACIÓN": "LEAK", "OSINT PASIVO": "OSINT", "SUPERFICIE DE ATAQUE": "SURF"}.get(cat, cat[:4].upper())
     return f"ASM-{prefix}-{h}"
 
 
@@ -1302,14 +1375,14 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
             "Sin SPF y DMARC, cualquier servidor puede enviar correos que parecen provenir del dominio, facilitando phishing y spear-phishing.",
             f"SPF: Ausente | DMARC: Ausente",
             "Alto riesgo de phishing corporativo.",
-            "Configurar SPF con -all y DMARC con p=reject.", "P1", MAPA["dns"])
+            "Inventariar remitentes legítimos, publicar SPF terminado en -all y avanzar DMARC none->quarantine->reject con rua/ruf.", "P1", MAPA["dns"])
     elif not spf or not dmarc:
         falt = "SPF" if not spf else "DMARC"
         add("ALTA", "CONFIGURACIÓN DE CORREO", f"{falt} no configurado",
             f"Ausencia de {falt} debilita la autenticación del correo del dominio.",
             f"SPF: {(spf[:80] if spf else 'Ausente')} | DMARC: {(dmarc[:80] if dmarc else 'Ausente')}",
             "Suplantación de dominio en correos.",
-            "Completar SPF -all y DMARC p=reject pct=100.", "P2", MAPA["dns"])
+            "Completar SPF y avanzar DMARC a p=reject pct=100 tras inventario de remitentes y reportes.", "P2", MAPA["dns"])
     elif "~all" in spf and "-all" not in spf.replace(" ", "").lower():
         add("MEDIA", "CONFIGURACIÓN DE CORREO", "SPF con ~all (softfail) — debilidad de configuración",
             "SPF con ~all no exige rechazo duro; DMARC p=reject puede mitigar pero SPF ~all sigue siendo debilidad.",
@@ -1331,7 +1404,7 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
                 "Verdict compuesto SPF+DMARC (Claude-OSINT spf_supply_chain) evalúa la spoofability del dominio.",
                 f"SPF: {(spf if spf else '(ninguno)')[:90]} | DMARC p={dns.get('dmarc_policy') or ''} | Verdict: {verdict_str[:60]}",
                 "Suplantación de dominio en correos (envelope/header).",
-                "Establecer SPF -all y DMARC p=reject pct=100; revisar dead-includes de la cadena SPF.", "P2", MAPA["dns"])
+                "Inventariar remitentes y dead-includes; avanzar DMARC a p=reject pct=100 de forma gradual.", "P2", MAPA["dns"])
     except Exception:
         pass
 
@@ -1364,7 +1437,7 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
         for _cf in csp_f[:8]:
             _dir = (_cf.get("directive") or _cf.get("type") or "?").strip()
             _typ = (_cf.get("type") or "").strip()
-            _sev_raw = (_cf.get("severity") or "medium").lower()
+            _sev_raw = severity.normalize(_cf.get("severity") or "medium")
             _sev_map = {"high": "ALTA", "medium": "MEDIA", "low": "BAJA"}
             _sev = _sev_map.get(_sev_raw, "MEDIA")
             _is_enforced = bool(csp_enforced)
@@ -1434,8 +1507,8 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
     subs = list(dict.fromkeys(_sub_name(s) for s in (p.get("subdomains") or []) + (p.get("crt_subdomains") or []) if _sub_name(s)))
     if subs:
         prod = [s for s in subs if not any(k in s.lower() for k in ("stag", "dev", "test", "internal", "intranet"))]
-        add("MEDIA", "SEGURIDAD DE ENDPOINTS", f"{len(subs)} subdominios detectados ({len(prod)} prod)",
-            "Los subdominios representan puntos de entrada adicionales; los olvidados suelen tener configuraciones debiles.",
+        add("MEDIA", "SEGURIDAD DE ENDPOINTS", f"{len(subs)} subdominios observados (CT/DNS, {len(prod)} prod)",
+            "Los subdominios representan puntos de entrada adicionales; los olvidados suelen tener configuraciones débiles.",
             f"DNS: {len(p.get('subdomains') or [])} | CT: {len(p.get('crt_subdomains') or [])} | Brute: {len(p.get('brute_subs') or [])} | Ej: {', '.join(subs[:3])[:140]}",
             "Activos olvidados sin mantenimiento.",
             "Inventariar y eliminar subdominios no usados; priorizar staging/dev/internal.", "P2", MAPA["osint"])
@@ -1443,17 +1516,17 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
     typos = p.get("typosquatting") or []
     if typos:
         tstr = "; ".join(f"{t.get('domain', '')} ({', '.join((t.get('ips') or [])[:1]) if t.get('ips') else 'no resuelve'})" for t in typos[:3])
-        add("MEDIA", "INGENIERIA SOCIAL", f"Typosquatting: {len(typos)} variante(s) activa(s)",
+        add("MEDIA", "INGENIERÍA SOCIAL", f"Typosquatting: {len(typos)} variante(s) activa(s)",
             "Atacantes registran dominios con errores tipográficos para interceptar tráfico o phishing. Cada variante que resuelve es riesgo activo.",
             f"Variantes: {tstr[:200]}",
-            "Phishing y suplantacion de identidad.",
-            "Monitorear y adquisicion defensiva; DMARC p=reject.", "P2", MAPA["osint"])
+            "Phishing y suplantación de identidad.",
+            "Monitorear y adquisición defensiva; DMARC p=reject.", "P2", MAPA["osint"])
 
-    if not (dns.get("dkim_records")):
+    if not dns.get("dkim_records") and dns.get("mx_records"):
         add("MEDIA", "ESTADO DE DNS", "DKIM no configurado",
             "DKIM permite al receptor verificar que el correo no fue alterado y proviene del dominio.",
             "DKIM: Ausente",
-            "Suplantacion y alteracion de correos sin detección.",
+            "Suplantación y alteración de correos sin detección.",
             "Configurar DKIM y alinear con DMARC.", "P2", MAPA["dns"])
     if not p.get("caa_records"):
         add("MEDIA", "SEGURIDAD DE RED", "CAA no configurado",
@@ -1471,14 +1544,14 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
     if ok_paths:
         ej = ", ".join(f"{r.get('path', r.get('url', '?'))} (HTTP {r.get('status', '?')})" for r in ok_paths[:3])
         add("MEDIA", "SEGURIDAD DE RED", f"Rutas públicas accesibles: {len(ok_paths)} responden",
-            "El probing de rutas comunes revelo endpoints que responden, exponiendo infraestructura o funciones internas.",
+            "El probing de rutas comunes reveló endpoints que responden, exponiendo infraestructura o funciones internas.",
             f"Rutas: {ej[:180]}",
-            "Exposicion de información (robots.txt, health, API docs).",
-            "Revisar cada ruta; deshabilitar innecesarias, proteger con autenticacion.", "P3", MAPA["net"])
+            "Exposición de información (robots.txt, health, API docs).",
+            "Revisar cada ruta; deshabilitar innecesarias, proteger con autenticación.", "P3", MAPA["net"])
 
     if not p.get("mta_sts"):
         add("MEDIA", "ESTADO DE DNS", "MTA-STS no configurado",
-            "MTA-STS pública políticas para exigir TLS en entrega de correo.",
+            "MTA-STS publica políticas para exigir TLS en la entrega de correo.",
             "MTA-STS: Ausente",
             "Correos pueden entregarse en texto plano.",
             "Configurar MTA-STS en modo enforce.", "P3", MAPA["dns"])
@@ -1507,23 +1580,23 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
     xpb = headers.get("x-powered-by", "")
     # Tarjeta "Servidor:" eliminada (detalle en Huella de Servidor sección 12); se conserva X-Powered-By por riesgo.
     if xpb:
-        add("BAJA", "SEGURIDAD DE APLICACION WEB", f"X-Powered-By: {xpb}",
-            "X-Powered-By expone el stack tecnologico.",
+        add("BAJA", "SEGURIDAD DE APLICACIÓN WEB", f"X-Powered-By: {xpb}",
+            "X-Powered-By expone el stack tecnológico.",
             f"X-Powered-By: {xpb}",
-            "Ayuda a buscar vulnerabilidades especificas.",
+            "Ayuda a buscar vulnerabilidades específicas.",
             "Eliminar X-Powered-By del servidor.", "P3", MAPA["app"])
     if not headers.get("cross-origin-opener-policy"):
-        add("BAJA", "SEGURIDAD DE APLICACION WEB", "COOP ausente",
-            "Cross-Origin-Opener-Policy aisla ventanas cross-origin contra canales laterales.",
+        add("BAJA", "SEGURIDAD DE APLICACIÓN WEB", "COOP ausente",
+            "Cross-Origin-Opener-Policy aísla ventanas cross-origin contra canales laterales.",
             "COOP: Ausente",
-            "Fuga via cross-origin (Spectre).",
+            "Fuga vía cross-origin (Spectre).",
             "Configurar same-origin.", "P3", MAPA["app"])
     if not (dns.get("ipv6") or dns.get("aaaa_records")):
         add("BAJA", "ESTADO DE DNS", "IPv6 (AAAA) no configurado",
             "IPv6 es el reemplazo de IPv4; su ausencia limita accesibilidad pero no es riesgo directo.",
             "AAAA: Ausente",
             "Sin redundancia IPv6.",
-            "Evaluar implementacion de IPv6.", "P4", MAPA["dns"])
+            "Evaluar implementación de IPv6.", "P4", MAPA["dns"])
     if not p.get("tls_rpt"):
         add("BAJA", "ESTADO DE DNS", "TLS-RPT no configurado",
             "TLS-RPT permite recibir informes de fallos TLS entre MX.",
@@ -1534,7 +1607,7 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
         add("BAJA", "ESTADO DE DNS", "BIMI no configurado",
             "BIMI muestra el logo junto a correos autenticados.",
             "BIMI: Ausente",
-            "Menor diferenciacion visual.",
+            "Menor diferenciación visual.",
             "Configurar BIMI con logo verificado.", "P4", MAPA["dns"])
 
     # Detalle supply/cert en seccion 12 (ficha GC); sin tarjeta duplicada aqui.
@@ -1547,9 +1620,9 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
         ej = ", ".join(f"{o.get('port')}/{o.get('service', RISKY.get(o.get('port'), '?'))}" for o in risky[:5])
         add("ALTA" if any(o.get("port") in (23, 445, 3389, 5900) for o in risky) else "MEDIA", "SEGURIDAD DE RED",
             f"Puertos sensibles abiertos: {len(risky)} ({ej[:120]})",
-            "Puertos de administracion/bases de datos expuestos a internet permiten fuerza bruta y exploits directos.",
+            "Puertos de administración/bases de datos expuestos a internet permiten fuerza bruta y exploits directos.",
             f"Puertos: {ej[:180]}",
-            "Acceso remoto o exfiltracion de bases de datos.",
+            "Acceso remoto o exfiltración de bases de datos.",
             "Cerrar o restringir por firewall/VPN; exponer solo 80/443.", "P1", MAPA["net"])
 
     risks = p.get("takeover_risks") or []
@@ -1559,29 +1632,29 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
         add("CRITICA", "SEGURIDAD DE ENDPOINTS", f"Subdomain takeover VULNERABLE: {len(vuln_take)}",
             "Un subdominio apunta (CNAME) a un servicio externo inexistente/liberado: un atacante puede reclamarlo y servir contenido bajo el dominio.",
             f"{ej[:200]}",
-            "Phishing y robo de sesiones bajo dominio legitimo.",
+            "Phishing y robo de sesiones bajo dominio legítimo.",
             "Eliminar el CNAME o reclamar el recurso externo ya.", "P1", MAPA["net"])
     elif risks:
         add("BAJA", "SEGURIDAD DE ENDPOINTS", f"Takeover bajo vigilancia: {len(risks)} CNAME(s) externos",
             "CNAMEs a terceros sin vulnerabilidad confirmada; vigilar expiraciones.",
             f"CNAMEs: {len(risks)}",
-            "Apropiacion futura si el destino se libera.",
+            "Apropiación futura si el destino se libera.",
             "Inventariar CNAMEs y alertar ante cambios.", "P4", MAPA["net"])
 
     patch = p.get("patching") or []
     eol = [x for x in patch if x.get("status") == "eol"]
     if eol:
         ej = ", ".join(f"{x.get('technology', '')} {x.get('version', '')}" for x in eol[:3])
-        add("ALTA" if len(eol) >= 2 else "MEDIA", "CADENCIA DE REVISIONES", f"Software EOL: {len(eol)} tecnologia(s) sin soporte ({ej[:100]})",
-            "Tecnologias end-of-life no reciben parches de seguridad.",
+        add("ALTA" if len(eol) >= 2 else "MEDIA", "CADENCIA DE REVISIONES", f"Software EOL: {len(eol)} tecnología(s) sin soporte ({ej[:100]})",
+            "Tecnologías end-of-life no reciben parches de seguridad.",
             f"EOL: {ej[:180]}",
-            "Explotacion de CVEs sin parche disponible.",
+            "Explotación de CVEs sin parche disponible.",
             "Migrar a versiones soportadas de inmediato.", "P2", MAPA["filt"])
 
     vulns = p.get("vulnerabilities") or []
     if vulns:
         ej = "; ".join(f"{v.get('cve_id', v.get('id', '?'))} ({v.get('package', '')})" for v in vulns[:3])
-        add("ALTA" if len(vulns) >= 3 else "MEDIA", "VULNERABILIDADES", f"{len(vulns)} vulnerabilidad(es) en tecnologias (OSV.dev)",
+        add("ALTA" if len(vulns) >= 3 else "MEDIA", "VULNERABILIDADES", f"{len(vulns)} vulnerabilidad(es) en tecnologías (OSV.dev)",
             "Versiones detectadas con CVEs conocidos según OSV.dev.",
             f"{ej[:200]}",
             "Explotación remota según CVSS.",
@@ -1600,21 +1673,21 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
         add("MEDIA", "VULNERABILIDADES", f"{len(cves)} CVE(s) por banner grab (vulscan, top riesgo {top.get('risk_score', '?')}{top_extra})",
             "Banners de servicio mapeados a CVEs probables, ordenados por riesgo (EPSS + KEV + severidad).",
             f"{ej[:200]}",
-            "Explotacion de servicios expuestos.",
+            "Explotación de servicios expuestos.",
             "Ocultar banners y parchear servicios.", "P2", MAPA["net"])
         kev = [c for c in cves if c.get("in_kev")]
         if kev:
             ej = "; ".join(c.get("id", "?") for c in kev[:3])
-            add("ALTA", "VULNERABILIDADES", f"{len(kev)} CVE(s) en catalogo CISA KEV (explotacion activa)",
+            add("ALTA", "VULNERABILIDADES", f"{len(kev)} CVE(s) en catálogo CISA KEV (explotación activa)",
                 "CISA KEV lista CVEs con explotación activa confirmada: parcheo prioritario.",
                 f"KEV: {ej[:200]}",
-                "Explotacion activa en curso.",
+                "Explotación activa en curso.",
                 "Parchear de inmediato o aplicar mitigación (deshabilitar servicio).", "P1", MAPA["filt"])
         hi = [c for c in cves if not c.get("in_kev") and (c.get("risk_score") or 0) >= 7]
         if hi:
             ej = "; ".join(f"{c.get('id', '?')} (riesgo {c.get('risk_score')})" for c in hi[:3])
             add("MEDIA", "VULNERABILIDADES", f"{len(hi)} CVE(s) con riesgo alto (EPSS/risk>=7)",
-                "Combinacion de probabilidad de explotación (EPSS) y severidad.",
+                "Combinación de probabilidad de explotación (EPSS) y severidad.",
                 f"{ej[:200]}",
                 "Alta probabilidad de explotación.",
                 "Priorizar parcheo en ventana de 30 días.", "P2", MAPA["filt"])
@@ -1639,9 +1712,9 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
         pubs = cloud.get("publicos") or cloud.get("buckets") or []
         pubs = [b for b in pubs if isinstance(b, dict) and b.get("public")]
         if pubs or cloud.get("archivos_sensibles"):
-            add("ALTA", "FILTRACION DE INFORMACION", "Almacenamiento cloud público expuesto",
-                "Buckets/contenedores accesibles sin autenticacion.",
-                f"Publicos: {len(pubs)} | Sensibles: {len(cloud.get('archivos_sensibles') or [])}",
+            add("ALTA", "FILTRACIÓN DE INFORMACIÓN", "Almacenamiento cloud público expuesto",
+                "Buckets/contenedores accesibles sin autenticación.",
+                f"Públicos: {len(pubs)} | Sensibles: {len(cloud.get('archivos_sensibles') or [])}",
                 "Descarga masiva de datos por terceros.",
                 "Bloquear acceso público y auditar logs de acceso.", "P1", MAPA["filt"])
     except Exception:
@@ -1683,10 +1756,31 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
                 "Mantener reglas gestionadas y ocultar IP de origen.", "P4", MAPA["net"])
         else:
             add("BAJA", "SEGURIDAD DE RED", "Sin WAF/CDN detectado",
-                "Sin capaAnti-DDoS/filtrado perimetral delante del origen.",
+                "Sin capa Anti-DDoS/filtrado perimetral delante del origen.",
                 "WAF: no detectado",
                 "DDoS e inyecciones llegan al origen.",
                 "Evaluar WAF gestionado (Cloudflare/AWS WAF).", "P3", MAPA["net"])
+    except Exception:
+        pass
+
+    _tls = p.get("tls") or {}
+    if _tls.get("chain_issue"):
+        add("ALTA", "SEGURIDAD DE RED", "Cadena TLS incompleta (intermedio ausente)",
+            "El puerto 443 negocia TLS pero la cadena no valida en clientes estrictos; el sitio responde igual.",
+            f"TLS: {_tls.get('negotiated_version') or '?'} | Emisor: {str(_tls.get('cert_issuer') or '?')[:80]} | Expira: {str(_tls.get('cert_expiry') or '?')[:40]}",
+            "Errores de confianza en clientes, APIs y webhooks.",
+            "Publicar la cadena completa (certificado + intermedios) en el servidor.", "P2", MAPA["net"])
+
+    # IP propia listada en DNSBL (la tarjeta de terceros cubre supply; esta cubre IP del dominio)
+    try:
+        own_rep = [r for r in ((p.get("dns") or {}).get("ip_reputation") or []) if isinstance(r, dict) and r.get("dnsbl")]
+        if own_rep:
+            _ips = "; ".join(f"{r.get('ip', '?')} en {r.get('dnsbl', '?')}" for r in own_rep[:4])
+            add("MEDIA", "REPUTACIÓN DE IP", f"IP propia listada en DNSBL ({len(own_rep)} registro(s))",
+                "IPs del dominio aparecen en listas DNSBL: riesgo de bloqueo de correo y clasificación de abuso.",
+                f"Listados: {_ips[:180]}",
+                "Bloqueo de correo saliente y reputación del dominio.",
+                "Investigar la causa (spam/malware), solicitar deslistado y endurecer el host.", "P2", MAPA["net"], rule="DNSBL-OWN-001")
     except Exception:
         pass
 
@@ -1699,7 +1793,7 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
             add("INFORMATIVA", "EXPOSICION DE IDENTIDAD", f"Fingerprint M365/Entra de {dom}",
                 "Huella Azure/Entra desde getuserrealm/OIDC/Autodiscover (Claude-OSINT m365_fingerprint).",
                 f"namespace {ns}"[:120],
-                "Enumeracion de cuentas y fuerza bruta.",
+                "Enumeración de cuentas y fuerza bruta.",
                 "Restringir autodiscover y aplicar bloqueo/throttling.", "P4", MAPA["osint"])
     except Exception:
         pass
@@ -1747,7 +1841,7 @@ def render_controls_table(providers: list[dict[str, Any]]) -> str:
       <table class="data" style="font-size:7.5px;"><thead><tr><th>Control</th>{top}</tr></thead><tbody>
       {rows}
       </tbody></table>
-      <div style="font-size:6px; color:#6B7280; margin-top:6px;">&#10004; PASS / &#10008; FAIL -- Valor exacto del control (cabecera, registro DNS, version TLS). Para detalle ver Hallazgos.</div>
+      <div style="font-size:6px; color:#6B7280; margin-top:6px;">&#10004; PASS / &#10008; FAIL — Valor exacto del control (cabecera, registro DNS, versión TLS). Para detalle ver Hallazgos.</div>
     </div>
     """
 
@@ -1952,31 +2046,31 @@ def render_factores_evaluados(providers: list[dict[str, Any]]) -> str:
     hdrs = lambda p: (p.get("https") or {}).get("headers") or {}
     rows = [
         ("Configuraciones DNS", "SPF/DMARC, DKIM, DNSSEC, DANE, MX, NS, CAA, MTA-STS, TLS-RPT, BIMI, STARTTLS",
-         "Verifica presencia y correcta configuración de registros DNS de seguridad y STARTTLS en MX",
+         "Verifica la presencia y correcta configuración de registros DNS de seguridad y STARTTLS en MX",
          f"SPF ausente {_c(lambda p: not dns(p).get('spf_record'))}/{n} · DMARC ausente {_c(lambda p: not dns(p).get('dmarc_record'))}/{n} · DNSSEC {_c(lambda p: dns(p).get('dnssec_ok'))}/{n}"),
-        ("SSL/TLS", "Version negociada, vigencia, SAN",
-         "Evalua la fortaleza de la configuración TLS del servidor web",
+        ("SSL/TLS", "Versión negociada, vigencia, SAN",
+         "Evalúa la fortaleza de la configuración TLS del servidor web",
          f"TLS: " + (", ".join(sorted({str((p.get('tls') or {}).get('negotiated_version', '--')) for p in providers})[:3]) or "--")),
         ("Cabeceras HTTP de seguridad", "HSTS, CSP, X-Frame-Options, X-Content-Type-Options",
          "Detecta cabeceras de seguridad faltantes o mal configuradas",
          f"HSTS falta {_c(lambda p: not hdrs(p).get('strict-transport-security'))}/{n} · CSP falta {_c(lambda p: not (hdrs(p).get('content-security-policy') or hdrs(p).get('content-security-policy-report-only')))}" + f"/{n}"),
-        ("Analisis de CSP", "Directivas CSP (base-uri, object-src, frame-ancestors, form-action, unsafe-inline/unsafe-eval, comodines, report-uri)",
-         "Deteccion de debilidades en la política de seguridad de contenido",
+         ("Análisis de CSP", "Directivas CSP (base-uri, object-src, frame-ancestors, form-action, unsafe-inline/unsafe-eval, comodines, report-uri)",
+         "Detección de debilidades en la política de seguridad de contenido",
          f"{_s(lambda p: len(p.get('csp_findings') or []))} hallazgo(s)"),
         ("Seguridad de Cookies", "Flags Secure, HttpOnly, SameSite",
-         "Verificacion de flags de seguridad en cookies HTTP",
+         "Verificación de flags de seguridad en cookies HTTP",
          f"{_s(lambda p: len(p.get('cookie_findings') or []))} hallazgo(s)"),
         ("Superficie de subdominios", "DNS + crt.sh + fuerza bruta + pivoteo IP",
          "Descubrimiento pasivo y semi-activo de subdominios y activos expuestos",
          f"{_s(lambda p: len(p.get('subdomains') or []) + len(p.get('crt_subdomains') or []))} subdominios · {_s(lambda p: len(p.get('brute_subs') or []))} por brute force"),
-        ("Reputacion de IPs", "DNSBL (Spamhaus, Barracuda, SpamCop, SORBS, CBL)",
+        ("Reputación de IPs", "DNSBL (Spamhaus, Barracuda, SpamCop, SORBS, CBL)",
          "Verifica si las IPs del dominio están listadas como maliciosas",
          f"{_s(lambda p: len((p.get('dns') or {}).get('ip_reputation') or []))} listado(s)"),
         ("Malware", "URLhaus (Abuse.ch)",
          "Consulta si el dominio ha sido reportado como distribuidor de malware",
          f"{'malicioso' if any((p.get('urlhaus') or {}).get('malicious') for p in providers) else 'limpio'}"),
         ("Vulnerabilidades", "OSV.dev + banners (vulscan) + EPSS/KEV",
-         "Deteccion de CVEs asociados a tecnologias y versiones, priorizados por explotacion",
+         "Detección de CVEs asociados a tecnologías y versiones, priorizados por explotación",
          f"{_s(lambda p: len(p.get('vulnerabilities') or []))} OSV · {_s(lambda p: len(p.get('cve_findings') or []))} banner · KEV {_s(lambda p: sum(1 for c in (p.get('cve_findings') or []) if c.get('in_kev')))}"),
         ("Fugas de credenciales", "leak-lookup + KUMO breach intel",
          "Identifica si el dominio aparece en breaches conocidos",
@@ -1984,7 +2078,7 @@ def render_factores_evaluados(providers: list[dict[str, Any]]) -> str:
         ("Typosquatting", "Variantes DNS (TLD, caracteres, omisiones)",
          "Genera variantes del dominio y verifica si están activas",
          f"{_s(lambda p: len(p.get('typosquatting') or []))} variante(s) activa(s)"),
-        ("Patching cadence", "endoflife.date",
+        ("Cadencia de parcheo", "endoflife.date",
          "Determina si las tecnologías detectadas están EOL o próximas a EOL",
          f"{_s(lambda p: sum(1 for x in (p.get('patching') or []) if x.get('status') == 'eol'))} EOL"),
         ("Subdomain Takeover", "CNAME + fingerprints (S3, CloudFront, Heroku, Azure, GitHub Pages, etc.)",
@@ -2047,7 +2141,7 @@ def render_matrix_asm(matrix: list[dict[str, Any]], score_by_domain: dict[str, f
         return (esc(sc) if sc is not None else "UNKNOWN", None)
 
     ctrls = [
-        ("Domain Score", "D", _score),
+        ("Overall B7", "D", _score),
         ("Subdominios", "G", lambda m: _cnt(m.get("subdominios", 0))),
         ("crt.sh", "G", lambda m: _cnt(m.get("crt_subdominios", 0))),
         ("HTTPS", "D", lambda m: (esc(m.get("https", "") or "--"), None)),
@@ -2089,10 +2183,10 @@ def render_matrix_asm(matrix: list[dict[str, Any]], score_by_domain: dict[str, f
             tds += _cell(val, good)
         rows += (f"<tr><td style='font-weight:600;'>{esc(label)}</td>"
                  f"<td class='num' style='font-size:7.5pt; color:#2F6F9F; font-weight:700; white-space:nowrap;'>{mv}</td>{tds}</tr>\n")
-    return ("<div class='section-sub' id='sec-matriz-asm'>11.3 Matriz de controles ASM</div>"
+    return ("<div class='section-sub' id='sec-matriz-asm'>8.2 Matriz de controles ASM</div>"
             "<table class='data'><thead><tr><th>Control</th><th>Mueve a</th>" + prov_heads + "</tr></thead>"
             f"<tbody>{rows}</tbody></table>"
-            "<div style='font-size:7pt; color:#6B7280;'>Columna Score (complemento B3): Domain Score por proveedor. Columna Mueve a: qué scores mueve cada control — <strong>D</strong>=Domain, <strong>G</strong>=General, <strong>O</strong>=Overall, <strong>—</strong>=contexto (no mueve score). Verde = verificado, rojo = fallido.</div>")
+            "<div style='font-size:7pt; color:#6B7280;'>Columna Score: higiene por dominio (domain_score, sec. 5). Columna Mueve a: qué scores mueve cada control — <strong>D</strong>=Domain, <strong>G</strong>=General, <strong>O</strong>=Overall, <strong>—</strong>=contexto (no mueve score). Verde = verificado, rojo = fallido.</div>")
 
 
 # ---------------------------------------------------------------------------
@@ -2113,17 +2207,20 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
     dom = p.get("domain", "")
     parts: list[str] = []
 
-    # Encabezado tarjeta proveedor (adopcion GC) + complemento B3 (Domain Score)
+    # Encabezado tarjeta proveedor (adopcion GC) + higiene tecnica (domain_score)
     _ips = ", ".join((p.get("dns") or {}).get("ipv4") or []) or "-"
     _h = p.get("https") or {}
     _tls = p.get("tls") or {}
     _subs = [_sub_name(s) for s in (p.get("subdomains") or []) if _sub_name(s)]
     _crt = [str(s) for s in (p.get("crt_subdomains") or []) if s]
     _san = [str(s) for s in (p.get("san_list") or []) if s]
-    _score = domain_score(p)
+    try:
+        _score = domain_score(p)
+    except Exception:
+        _score = 0.0
     _https_txt = str(_h.get("status_code")) if isinstance(_h.get("status_code"), int) else str(_h.get("error") or "-")
     parts.append(
-        f"<div class='section-sub2'>Ficha detallada -- {esc(dom)}</div>"
+        f"<div class='section-sub2'>Ficha detallada — {esc(dom)}</div>"
         f"<div style='background:#F3F5F7; border:1px solid #D9DEE3; border-radius:8px; padding:12px 14px; display:flex; align-items:center; gap:12px; margin-bottom:8px;'>"
         f"<div style='flex:1;'><div style='font-size:12pt; font-weight:800; color:#173B67;'>{esc(p.get('name') or dom)}</div>"
         f"<div style='font-size:8pt; color:#6B7280;'><code>{esc(dom)}</code> - {esc(_ips)}</div>"
@@ -2314,7 +2411,7 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
     if csp_f:
         items = ""
         for f in csp_f[:10]:
-            icon = "&#10007;" if f.get("severity") == "high" else ("&#9888;" if f.get("severity") == "medium" else "&#9679;")
+            icon = "&#10007;" if severity.normalize(f.get("severity")) == "high" else ("&#9888;" if severity.normalize(f.get("severity")) == "medium" else "&#9679;")
             items += f"<li>{icon} [{str(f.get('severity', '')).upper()}] <strong>{esc(f.get('directive', ''))}</strong>: {esc(str(f.get('description', ''))[:140])}</li>"
         if len(csp_f) > 10:
             items += f"<li class='muted'>... y {len(csp_f) - 10} más</li>"
@@ -2324,7 +2421,7 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
     if ck_f:
         items = ""
         for f in ck_f[:10]:
-            icon = "&#10007;" if f.get("severity") == "high" else ("&#9888;" if f.get("severity") == "medium" else "&#9679;")
+            icon = "&#10007;" if severity.normalize(f.get("severity")) == "high" else ("&#9888;" if severity.normalize(f.get("severity")) == "medium" else "&#9679;")
             items += f"<li>{icon} [{str(f.get('severity', '')).upper()}] {esc(str(f.get('description', ''))[:160])}</li>"
         if len(ck_f) > 10:
             items += f"<li class='muted'>... y {len(ck_f) - 10} más</li>"
@@ -2602,20 +2699,48 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
     strix = p.get("strix") or {}
     if strix and strix.get("status") == "ok":
         fds = strix.get("findings") or []
+        by_sev = strix.get("by_severity") or {}
+        cost = strix.get("cost_usd") or 0
+        budget = (strix.get("guardrails") or {}).get("budget_usd")
         strix_meta = "Modo " + esc(str(strix.get("mode", "?"))) + " - " + str(len(fds)) + " hallazgo(s)"
-        if strix.get("cost_usd"):
-            strix_meta += " - costo LLM $" + str(strix.get("cost_usd"))
-        parts.append("<h4>Strix AI Pentest</h4><p class='meta'>" + strix_meta + "</p>")
+        if strix.get("cvss_max"):
+            strix_meta += " - CVSS max " + str(strix.get("cvss_max"))
+        if cost:
+            strix_meta += " - costo LLM $" + str(cost)
+            if budget is not None:
+                strix_meta += " (tope $" + str(budget) + ")"
+        if by_sev:
+            chips = " ".join(str(by_sev[k]) + " " + k for k in ("critical", "high", "medium", "low", "info") if by_sev.get(k))
+            if chips:
+                strix_meta += " - " + chips
+        if strix.get("run_status"):
+            strix_meta += " - estado " + esc(str(strix.get("run_status")))
+        block = "<h4>Strix AI Pentest</h4><p class='meta'>" + strix_meta + "</p>"
+        if (strix.get("guardrails") or {}).get("over_budget"):
+            block += "<p class='meta'><span class='err'>Presupuesto LLM excedido (OWASP LLM10)</span></p>"
+        if strix.get("instruction"):
+            block += "<p class='meta'>Instruccion: " + esc(str(strix.get("instruction"))[:160]) + "</p>"
         if fds:
             items = ""
-            for f in sorted(fds, key=lambda x: str(x.get("severity", "")).lower() in ("critical", "critica", "high", "alta"), reverse=True)[:8]:
+            for f in sorted(fds, key=lambda x: severity.normalize(x.get("severity", "")) in ("critical", "high"), reverse=True)[:8]:
                 sev = esc(str(f.get("severity", "?")))
                 title = esc(str(f.get("title", "?"))[:100])
                 cve = esc(str(f.get("cve", "-")))
                 cvss = esc(str(f.get("cvss", "-")))
                 rem = esc(str(f.get("remediation_steps", f.get("remediation", "")))[:160])
-                items += "<li><b>[" + sev + "]</b> <strong>" + title + "</strong> - " + cve + " - CVSS " + cvss + "<br/><span class='muted'>" + rem + "</span></li>"
-            parts.append("<ul class='compact'>" + items + "</ul>")
+                meta_bits = [cve, "CVSS " + cvss]
+                if f.get("endpoint"):
+                    meta_bits.append(esc(str(f.get("endpoint"))[:80]))
+                if f.get("confidence"):
+                    meta_bits.append("conf " + esc(str(f.get("confidence"))))
+                if f.get("fix_effort"):
+                    meta_bits.append("esfuerzo " + esc(str(f.get("fix_effort"))))
+                badges = (_oasm.render_finding_badges(f, domain=p.get("domain")) if _oasm else "")
+                items += "<li><b>[" + sev + "]</b> <strong>" + title + "</strong> - " + " - ".join(meta_bits) + ((" " + badges) if badges else "") + "<br/><span class='muted'>" + rem + "</span></li>"
+            block += "<ul class='compact'>" + items + "</ul>"
+        if strix.get("sarif_results"):
+            block += "<p class='meta'>Hallazgos exportables SARIF: " + str(strix.get("sarif_results")) + "</p>"
+        parts.append(block)
 
     fr = p.get("finalrecon") or {}
     if fr:
@@ -2654,6 +2779,23 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
         if not oitems:
             oitems = '<li class="muted">Sin hallazgos que afecten compliance.</li>'
         parts.append(f"<h4>OWASP Agentic Top 10 -- Grado: {esc(str(grade))} ({pct}%)</h4><ul class='compact'>{oitems}</ul>")
+
+    ow_web = None
+    for m in (matrix or []):
+        if isinstance(m, dict) and m.get("dominio") == dom and m.get("owasp_web"):
+            ow_web = m.get("owasp_web")
+            break
+    if ow_web and not ow_web.get("error") and str(ow_web.get("overall_grade", "?")).strip() not in ("?", "", "-", "N/A"):
+        wgrade = ow_web.get("overall_grade", "--")
+        wpct = ow_web.get("overall_compliance", 0)
+        witems = ""
+        for r_id, r_data in sorted((ow_web.get("risks") or {}).items()):
+            if isinstance(r_data, dict) and r_data.get("finding_count", 0) > 0:
+                icon = "&#10007;" if r_data.get("compliance_pct", 100) < 60 else "&#10003;"
+                witems += f"<li>{icon} <strong>{esc(r_id)}</strong>: Grado {esc(str(r_data.get('grade', '?')))} ({r_data.get('compliance_pct', '?')}%) -- {r_data.get('finding_count', 0)} hallazgo(s)</li>"
+        if not witems:
+            witems = '<li class="muted">Sin hallazgos que afecten compliance.</li>'
+        parts.append(f"<h4>OWASP Web Top 10 (2025) -- Grado: {esc(str(wgrade))} ({wpct}%)</h4><ul class='compact'>{witems}</ul>")
 
     social = p.get("social") or {}
     if social:
@@ -2777,6 +2919,34 @@ def _logo_gc_b64() -> str:
         return ""
 
 
+def _oasm_section_b6(p0: dict[str, Any], dom0: str, overall: Any,
+                     all_findings: list[dict[str, Any]], hist: Any) -> str:
+    if _oasm is None:
+        return ""
+    try:
+        trend_hist = _oasm.load_history(dom0, 90, "overall_score") or hist or []
+        return (
+            _oasm.render_trend_block(trend_hist, "Tendencia del Score (90 dias)")
+            + _oasm.render_lifecycle_block(dom0, all_findings)
+            + (_eeasm.render_asset_change_block(dom0, p0) if _eeasm is not None else "")
+            + (_eeasm.render_permutation_block(dom0, p0) if _eeasm is not None else "")
+            + (_sc.render_provider_scorecard_block(dom0, p0) if _sc is not None else "")
+            + (_hotlist.render_hotlist_block(dom0, p0) if _hotlist is not None else "")
+            + (_origin.render_origin_block(dom0, p0) if _origin is not None else "")
+            + (_dnsx.render_dns_extra_block(dom0, p0) if _dnsx is not None else "")
+            + (_xen.render_fusion_block(dom0, p0) if _xen is not None else "")
+            + (_xen.render_ctem_block(dom0, p0) if _xen is not None else "")
+            + (_xen.render_insurance_block(dom0, p0) if _xen is not None else "")
+            + (_xen.render_pqc_block(dom0, p0) if _xen is not None else "")
+            + (_xen.render_ransomware_block(dom0, p0) if _xen is not None else "")
+            + (_rng.render_gf_block(dom0, p0) if _rng is not None else "")
+            + (_rng.render_interesting_block(dom0, p0) if _rng is not None else "")
+            + (_rng.render_webports_block(dom0, p0) if _rng is not None else "")
+        )
+    except Exception:
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # Build report HTML
 # ---------------------------------------------------------------------------
@@ -2793,10 +2963,31 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
     org_show = org or "GrupoCibest"
     dom0 = providers[0].get("domain", "N/A") if providers else "N/A"
 
-    factores = compute_factores(providers)
+    asm_matrix = asm.get("matrix") or []
+    # Orden canonico de factores (Overall -> Domain -> Factor), cada metrica con
+    # motor propio y sin doble deduccion entre metricas:
+    #   Overall = benchmark B7 (base precia + impactos decimales, sec. 4);
+    #   Domain  = higiene tecnica B5/B6 (domain_score por proveedor, sec. 5);
+    #   Factor  = consolidacion B5/B6 de 10 factores (compute_factores, sec. 6).
+    # _B6_SSC queda como catalogo canonico de los 10 nombres (orden + test).
+    _b7_mapped = bool(_B7MOD is not None and hasattr(_B7MOD, "b7_provider_scores") and providers)
+    _b7p_res = []
+    if _b7_mapped:
+        try:
+            for _pp in providers:
+                _b7p_res.append({"domain": str(_pp.get("domain", "")), **_B7MOD.b7_provider_scores(_pp, asm_matrix)})
+        except Exception:
+            _b7p_res = []
+            _b7_mapped = False
+    try:
+        _order = {name: i for i, (name, _k) in enumerate(_B6_SSC)}
+        factores = sorted(compute_factores(providers), key=lambda f: _order.get(f["factor"], 99))
+        dscore = round(sum(domain_score(p) for p in providers) / max(len(providers), 1), 1) if providers else 0.0
+        _score_by_dom = {str(p.get("domain", "")): domain_score(p) for p in providers} if providers else {}
+    except Exception:
+        factores, dscore, _score_by_dom = [], 0.0, {}
     score_general = int(sum(f["score"] for f in factores) / max(len(factores), 1)) if factores else 0
-    dscore = round(sum(domain_score(p) for p in providers) / max(len(providers), 1), 1) if providers else 0.0
-    # Overall único (P0): promedio ponderado precia_scorecard, no promedio simple B3
+    # Overall único (P0): promedio simple precia_scorecard v3.0 (sin pesos), no promedio simple B3
     try:
         from precia_scorecard import factor_scores as _pscores, overall_score as _poverall
         if providers:
@@ -2807,29 +2998,27 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
     except Exception:
         overall = int(sum(f["score"] for f in factores[:10]) / max(min(len(factores), 10), 1)) if factores else 0
 
-    # Fusión B7: Overall único con motor B7 (base precia + impactos decimales)
+    # Fusión B7: Overall único con motor B7 (base precia + impactos decimales).
+    # Reutiliza el cálculo ya hecho para el mapeo (sin doble fetch OSINT).
     _b7p = providers[0] if providers else {}
+    _r0 = (_b7p_res[0] if (_b7_mapped and _b7p_res and _b7p_res[0]) else None)
     _b7_issues: list = []
     _b7_by: dict = {}
     _b7_scores: dict = {}
-    try:
-        if _B7MOD is not None:
-            _b7_issues = _B7MOD.collect_issues(_b7p) or []
-            _b7_by = _B7MOD.issues_by_factor(_b7_issues)
-            _b7_base = dict(_B7MOD._precia_scores(_b7p)) if _B7MOD._precia_scores else {}
-            for _k, _, _ in _B7MOD.SSC_FACTORS:
-                _b7_base.setdefault(_k, 100)
-            for _k, _, _ in _B7MOD.SSC_FACTORS:
-                _b7_scores[_k] = max(0, min(100, round(_b7_base.get(_k, 100) + sum(float(i.get("impact", 0) or 0) for i in _b7_by.get(_k, [])))))
-            try:
-                if _B7MOD._precia_overall:
-                    overall = int(_B7MOD._precia_overall(_b7_scores))
-                else:
-                    overall = int(sum(_b7_scores.values()) / max(len(_b7_scores), 1))
-            except Exception:
-                pass
-    except Exception:
-        pass
+    if _r0 is not None:
+        _b7_issues = _r0["issues"] or []
+        _b7_by = _r0["by_factor"]
+        _b7_base = _r0["base"]
+        for _k, _, _ in _B7MOD.SSC_FACTORS:
+            _b7_base.setdefault(_k, 100)
+        _b7_scores = _r0["scores"]
+        try:
+            if _B7MOD._precia_overall:
+                overall = int(_B7MOD._precia_overall(_b7_scores))
+            else:
+                overall = int(sum(_b7_scores.values()) / max(len(_b7_scores), 1))
+        except Exception:
+            pass
     _b7_company = str((_b7p.get("name", "") or _b7p.get("domain", "")) or dom0)
     try:
         _b7_sector_en = str(_B7MOD._precia_industry(_b7p)) if (_B7MOD is not None and _B7MOD._precia_industry) else "—"
@@ -2878,6 +3067,12 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         n_med = sum(1 for f in all_findings if f["severidad"] == "MEDIA")
         n_baja = sum(1 for f in all_findings if f["severidad"] == "BAJA")
         n_info = sum(1 for f in all_findings if f["severidad"] in ("INFORMATIVA", "INFO"))
+    # Conteos del universo documentado (tarjetas B6, sección 10)
+    m_crit = sum(1 for f in all_findings if f["severidad"] == "CRITICA")
+    m_alta = sum(1 for f in all_findings if f["severidad"] == "ALTA")
+    m_med = sum(1 for f in all_findings if f["severidad"] == "MEDIA")
+    m_baja = sum(1 for f in all_findings if f["severidad"] == "BAJA")
+    m_info = sum(1 for f in all_findings if f["severidad"] in ("INFORMATIVA", "INFO"))
 
     # Superficie agregada
     subs_all: list[str] = []
@@ -2911,7 +3106,7 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
             if _hist_first and _hist_last and len(hist) >= 2:
                 _delta = _hist_last.get("score", 0) - _hist_first.get("score", 0)
                 _delta_txt = f"{_delta:+g}" if _delta else "0"
-                _hist_extra = f"<div class='info-box' style='font-size:7pt; margin-top:8px;'>Historial 30 días: {len(hist)} puntos — Primero: {str(_hist_first.get('fecha',''))[:10]} Score {_hist_first.get('score','—')} → Último: {str(_hist_last.get('fecha',''))[:10]} Score {_hist_last.get('score','—')} (Δ{_delta_txt}) — Superficie/score estable indica monitoreo continuo, no simulación. Para detalle de hallazgos nuevos/cerrados/persistentes ver sección 12 y trazabilidad.</div>"
+                _hist_extra = f"<div class='info-box' style='font-size:7pt; margin-top:8px;'>Historial 30 días: {len(hist)} puntos — Primero: {str(_hist_first.get('fecha',''))[:10]} Score {_hist_first.get('score','—')} → Último: {str(_hist_last.get('fecha',''))[:10]} Score {_hist_last.get('score','—')} (Δ{_delta_txt}) — Superficie/score estable indica monitoreo continuo, no simulación. Para el detalle de hallazgos nuevos/cerrados/persistentes ver la sección 10 y la trazabilidad. Serie score_general con heurística anterior (misma familia que el Factor actual); el Overall actual usa motor B7 (ver deltas).</div>"
                 hist_html += _hist_extra
         except Exception:
             pass
@@ -2954,6 +3149,9 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
                              _B3_FACTOR_CATS.get(f["factor"], []))
         frows += (f"<tr><td class='num {cls}'>{sc}</td><td>{esc(_DISP_FACTOR.get(f['factor'], f['factor']))}</td><td class='num'>{f['incidencias']}</td>"
                   f"<td style='font-size:8pt;'>{ded_txt}</td><td class='num' style='white-space:nowrap;'>{refs}</td></tr>\n")
+    frows += (f"<tr style='background:#EEF1F5; font-weight:800;'><td class='num'>—</td><td>TOTAL</td>"
+              f"<td class='num' style='color:#173B67;'>{sum(f['incidencias'] for f in factores)}</td>"
+              f"<td style='font-size:6pt; color:#6B7280;'>Σ por factor (una tarjeta puede contar en varios factores)</td><td class='num'>—</td></tr>\n")
 
     # Superficie tabla (extendida con adopcion GC: JS, externos, sitemap, Wayback, API)
     n_js = n_ext = n_sitemap = n_wb = n_wb_js = n_wb_api = n_wb_params = n_api = 0
@@ -3007,7 +3205,7 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         ("Takeover risks", str(n_take), "Subdominios vulnerables a apropiacion"),
         ("Typosquatting", str(n_typo), "Dominios fraudulentos activos"),
         ("Credenciales filtradas", str(n_leak), "Breaches de seguridad activos"),
-        ("Software EOL", str(n_eol), "Tecnologias sin soporte"),
+        ("Software EOL", str(n_eol), "Tecnologías sin soporte"),
         ("Archivos JS expuestos", str(n_js), "JS publicos (crawler + Wayback)"),
         ("Enlaces externos", str(n_ext), "Dependencias de terceros"),
         ("URLs en sitemap", str(n_sitemap), "Rutas indexadas del sitio"),
@@ -3022,7 +3220,8 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
     asset_hist = load_asset_history(asm)
     asset_svg = _asset_history_svg(asset_hist)
     _explain = '<div class="info-box" style="font-size:8pt;"><strong>Cómo leer este gráfico:</strong> muestra la evolución de la superficie en 30 días — <span style="color:#173B67;">● Subs</span> (azul), <span style="color:#2E7D32;">● IPs</span> (verde) y <span style="color:#EF6C00;">● Puertos</span> (naranja). Línea plana = superficie estable; pico en azul = nuevos subdominios descubiertos (como CT); subida en verde/naranja = nueva IP o puerto expuesto. Datos de <code>scan_assets</code> (requiere 2+ scans).</div>'
-    asset_history_html = f"<div class='section-sub' id='sec-superficie-hist'>10.2 Evolución de Superficie (30 días)</div>{'<div style=text-align:center;overflow-x:auto;>' + asset_svg + '</div>' + _explain if asset_svg else '<div class=info-box>Sin historial suficiente de superficie (se requieren 2+ escaneos).</div>'}"
+    _svg_wrap_open = '<div style="text-align:center;overflow-x:auto;">'
+    asset_history_html = f"<div class='section-sub' id='sec-superficie-hist'>7.2 Evolución de Superficie (30 días)</div>{(_svg_wrap_open + asset_svg + '</div>' + _explain) if asset_svg else '<div class=info-box>Sin historial suficiente de superficie (se requieren 2+ escaneos).</div>'}"
 
     # DNS apex primer proveedor
     p0 = providers[0] if providers else {}
@@ -3038,8 +3237,11 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
                 out.append(str(v))
         return out
 
-    mx = ", ".join(_str_list(d0.get("mx_records"))) or "N/A"
-    ns = ", ".join(_str_list(d0.get("ns_records"))) or "N/A"
+    _derr = " ".join(d0.get("errors") or [])
+    mx = ", ".join(_str_list(d0.get("mx_records"))) or ("no verificado (error DNS)" if "MX@" in _derr else "ausente")
+    ns = ", ".join(_str_list(d0.get("ns_records"))) or ("no verificado (error DNS)" if "NS@" in _derr else "ausente")
+    _spf_txt = (d0.get("spf_record") or ("no verificado (error DNS)" if "SPF@" in _derr else "ausente"))[:120]
+    _dmarc_txt = (d0.get("dmarc_record") or ("no verificado (error DNS)" if "DMARC@" in _derr else "ausente"))[:120]
 
     # Matriz controles — estados normalizados PASS/PARTIAL/FAIL (enforced vs report-only)
     h0 = _hdrs(p0)
@@ -3056,7 +3258,7 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         _csp_st = "PASS"
     ctrl_estado = [
         ("HTTPS", "PASS" if (p0.get("https") or {}).get("status_code") else "FAIL"),
-        ("TLS 1.2/1.3", "PASS" if (p0.get("tls") or {}).get("negotiated_version") else "FAIL"),
+        ("TLS 1.2/1.3 + cadena", "FAIL" if ((p0.get("tls") or {}).get("chain_issue") or not (p0.get("tls") or {}).get("negotiated_version")) else "PASS"),
         ("HSTS", "PASS" if h0.get("strict-transport-security") else "FAIL"),
         ("CSP", _csp_st),
         ("SPF", "PASS" if d0.get("spf_record") else "FAIL"),
@@ -3075,33 +3277,6 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         return '<span style="background:#fce4e4; color:#C62828; border:1px solid #C62828; border-radius:4px; padding:2px 7px; font-size:7.5pt; font-weight:800;">FAIL</span>'
     ctrl_html = "".join(f"<tr><td style='font-weight:600;'>{esc(n)}</td><td>{_st_badge(s)}</td></tr>" for n, s in ctrl_estado)
 
-    # Hallazgos agregados (top categorias) con impacto real: peso severidad x conteo normalizado
-    from collections import Counter
-    _sev_w = {"CRITICA": 1.0, "ALTA": 0.7, "MEDIA": 0.4, "BAJA": 0.2, "INFORMATIVA": 0.0, "INFO": 0.0}
-    _groups: dict[tuple[str, str], list] = {}
-    for f in all_findings:
-        _groups.setdefault((f["categoria"], f["titulo"][:60]), []).append(f)
-    _maxc = max((len(v) for v in _groups.values()), default=0)
-    _agg = []
-    for (c, t), fs in _groups.items():
-        _w = max(_sev_w.get(x.get("severidad", ""), 0.0) for x in fs)
-        _imp = round(_w * (len(fs) / _maxc), 2) if _maxc else 0.0
-        _agg.append((_imp, c, t, len(fs), _mueve_a(fs[0])))
-    _agg.sort(reverse=True)
-    if _agg:
-        _imp0, _c0, _t0, _n0, _m0 = _agg[0]
-        _w0 = max(_sev_w.get(x.get("severidad", ""), 0.0) for x in _groups[(_c0, _t0)])
-        _maxc0 = max((len(v) for v in _groups.values()), default=1)
-        agg_example = (f"<div style='font-size:8.5pt; color:#4B6563; margin:6px 0;'>Detalle <strong>{esc(_c0)}</strong>: {_n0} hallazgo(s) x peso {_w0:g} / max {_maxc0} = <strong>{_imp0:.2f}</strong>.</div>")
-    else:
-        agg_example = ""
-    agg_html = "".join(
-        f"<tr><td>{esc(_DISP_CAT.get(c, c))}</td><td>{esc(t)} <span style='font-size:7.5pt; color:#6B7280;'>({n})</span></td>"
-        f"<td>{esc(dom0)}</td><td class='num' style='font-weight:700;'>{imp:.2f}</td><td class='num' style='white-space:nowrap;'>{mueve}</td></tr>"
-        for imp, c, t, n, mueve in _agg[:8])
-    agg_note = ("<div style='font-size:7pt; color:#6B7280;'>Impacto = peso severidad "
-                "(Critica 1.0, Alta 0.7, Media 0.4, Baja 0.2) x conteo del grupo / conteo maximo.</div>")
-
     # OSINT pasivo tabla (CT/SAN/CAA/MTA-STS por dominio)
     osint_rows = ""
     for p in providers:
@@ -3112,12 +3287,7 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         osint_rows += f"<tr><td>{esc(p.get('domain', ''))}</td><td class='num'>{ct}</td><td class='num'>{san}</td><td class='num'>{caa}</td><td class='num'>{msts}</td></tr>"
 
     # Adopcion GC: ficha detallada por proveedor + matriz ASM con Score
-    asm_matrix = asm.get("matrix") or []
     gc_sections = "".join(gc_provider_detail(p, asm_matrix) for p in providers)
-    try:
-        _score_by_dom = {str(p.get("domain", "")): domain_score(p) for p in providers}
-    except Exception:
-        _score_by_dom = {}
     matrix_asm_html = render_matrix_asm(asm_matrix, _score_by_dom)
 
     # Sec 1: riesgo basado en Puntuación Global (Overall) — sección 2 es fuente de verdad para Resumen
@@ -3187,6 +3357,12 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         else:
             ds_rows += (f"<tr><td>{esc(_ctl)}</td><td>{esc(_rule)}</td><td>{esc(_ref)}</td>"
                         f"<td style='color:#2E7D32; font-weight:700;'>&#10003; pasa</td></tr>\n")
+    # Resumen por dominio con higiene tecnica (domain_score): una fila por proveedor.
+    _dom_hyg_rows = ""
+    for _dd in sorted(_score_by_dom):
+        _vv = _score_by_dom[_dd]
+        _gl = "A" if _vv >= 90 else "B" if _vv >= 80 else "C" if _vv >= 70 else "D" if _vv >= 60 else "F"
+        _dom_hyg_rows += (f"<tr><td>{esc(_dd)}</td><td class='num'>{_vv}</td><td>{_gl}</td></tr>\n")
     _g_frac = max(0.0, min(1.0, score_general / 100.0))
     _g_len = 3.14159 * 80
     _g_prog = round(_g_len * _g_frac, 1)
@@ -3195,7 +3371,18 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#D9DEE3" stroke-width="14" stroke-linecap="round"/>'
         f'<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#2E7D32" stroke-width="14" stroke-linecap="round" stroke-dasharray="{_g_prog} {_g_len}"/>'
         f'<text x="100" y="88" text-anchor="middle" font-size="22" font-weight="800" fill="#1F2933">{score_general}</text>'
-        '<text x="100" y="102" text-anchor="middle" font-size="8" fill="#6B7280">Security Score</text>'
+        '<text x="100" y="102" text-anchor="middle" font-size="8" fill="#6B7280">Factor Score</text>'
+        "</svg>"
+    )
+    _d_frac = max(0.0, min(1.0, float(dscore) / 100.0))
+    _d_prog = round(_g_len * _d_frac, 1)
+    _d_color = _sc_color(dscore)
+    gauge_domain_svg = (
+        '<svg width="200" height="120" xmlns="http://www.w3.org/2000/svg" style="font-family:Arial,Helvetica,sans-serif;">'
+        '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#D9DEE3" stroke-width="14" stroke-linecap="round"/>'
+        f'<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="{_d_color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="{_d_prog} {_g_len}"/>'
+        f'<text x="100" y="88" text-anchor="middle" font-size="22" font-weight="800" fill="#1F2933">{dscore}</text>'
+        '<text x="100" y="102" text-anchor="middle" font-size="8" fill="#6B7280">Puntuación por dominio</text>'
         "</svg>"
     )
 
@@ -3222,13 +3409,17 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
             _ov_impact_txt = ", ".join(f"{_ov_lbl.get(k, k)} ({v}/100)" for k, v in _ov_weak) if _ov_weak else "ninguno (todos en 100/100)"
         except Exception:
             _ov_impact_txt = _weak_txt
-        # Reconciliación B7: Top-3 e incidencias con scores/issues B7 (Overall único)
+        # Reconciliación B7: Top-3, incidencias y semáforo con scores/issues B7 (Overall único)
         if _b7_scores and _B7MOD is not None:
             _b7n2 = {k: n for k, n, _ in _B7MOD.SSC_FACTORS}
             _ov_weak = sorted([(k, int(v)) for k, v in _b7_scores.items()], key=lambda x: x[1])[:3]
             _weak_txt = ", ".join(f"{k} {v}" for k, v in _ov_weak)
             _ov_impact_txt = ", ".join(f"{_b7n2.get(k, k)} ({v}/100)" for k, v in _ov_weak)
             _ov_inc = {k: len(_b7_by.get(k, [])) for k, _, _ in _B7MOD.SSC_FACTORS}
+            _n_fact_verde = sum(1 for v in _b7_scores.values() if int(v) >= 90)
+            _n_fact_amarillo = sum(1 for v in _b7_scores.values() if 70 <= int(v) < 90)
+            _n_fact_naranja = sum(1 for v in _b7_scores.values() if 60 <= int(v) < 70)
+            _n_fact_rojo = sum(1 for v in _b7_scores.values() if int(v) < 60)
         _ov_g_frac = max(0.0, min(1.0, overall / 100.0))
         _ov_g_prog = round(_g_len * _ov_g_frac, 1)
         _ov_g_color = _sc_color(overall)
@@ -3247,7 +3438,18 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         _n_fact_verde = _n_fact_amarillo = _n_fact_naranja = _n_fact_rojo = 0
         _weak_txt = "—"
         _ov_impact_txt = "—"
-        gauge_overall_svg = gauge_svg
+        # Fallback: use overall (Puntuación Global) instead of score_general
+        _ov_g_frac = max(0.0, min(1.0, overall / 100.0))
+        _ov_g_prog = round(_g_len * _ov_g_frac, 1)
+        _ov_g_color = _sc_color(overall)
+        gauge_overall_svg = (
+            '<svg width="200" height="120" xmlns="http://www.w3.org/2000/svg" style="font-family:Arial,Helvetica,sans-serif;">'
+            '<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#D9DEE3" stroke-width="14" stroke-linecap="round"/>'
+            f'<path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="{_ov_g_color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="{_ov_g_prog} {_g_len}"/>'
+            f'<text x="100" y="88" text-anchor="middle" font-size="22" font-weight="800" fill="#1F2933">{overall}</text>'
+            '<text x="100" y="102" text-anchor="middle" font-size="8" fill="#6B7280">Overall Score</text>'
+            "</svg>"
+        )
 
     # Punto 9: deltas vs escaneo anterior (BD real)
     prev = prev_scan_scores(dom0) if providers else None
@@ -3260,13 +3462,13 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
             _prev_ov = prev.get('overall_score')
             _delta_ov = _delta_str(float(overall), float(_prev_ov)) if _prev_ov else ""
             delta_strip = (f"<div style='font-size:8pt; color:#6B7280; margin:10px 0;'>"
-                           f"vs escaneo anterior ({prev_fecha}): Factor Score {prev.get('score_general')} {_delta_str(score_general, prev.get('score_general'))}"
-                           f" &nbsp;|&nbsp; Domain {prev.get('domain_score')} {_delta_str(dscore, prev.get('domain_score'))}"
+                           f"vs escaneo anterior ({prev_fecha}): Factor Score {prev.get('score_general')} {_delta_str(score_general, prev.get('score_general'))} (actual: heurística B6; histórico: heurística anterior)"
+                           
                            f" &nbsp;|&nbsp; Overall B6 oficial: {overall} (el historial mostraba el Overall B5 previo; no aplica delta por cambio de metodología).</div>")
         else:
             delta_strip = (f"<div style='font-size:8pt; color:#4B6563; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:6px; padding:8px 12px; margin:10px 0;'>"
-                           f"vs escaneo anterior ({prev_fecha}): Factor Score {prev.get('score_general')} {_delta_str(score_general, prev.get('score_general'))}"
-                           f" &nbsp;|&nbsp; Domain {prev.get('domain_score')} {_delta_str(dscore, prev.get('domain_score'))}"
+                           f"vs escaneo anterior ({prev_fecha}): Factor Score {prev.get('score_general')} {_delta_str(score_general, prev.get('score_general'))} (actual: heurística B6; histórico: heurística anterior)"
+                           
                            f" &nbsp;|&nbsp; Overall {prev.get('overall_score')} {_delta_str(overall, prev.get('overall_score'))}</div>")
     else:
         delta_strip = "<div style='font-size:8pt; color:#6B7280; margin:10px 0;'>Primer escaneo registrado para este dominio (sin anterior para comparar).</div>"
@@ -3295,17 +3497,18 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
                            f"<td><strong>{esc(_t.get('titulo', ''))}</strong><br><span style='font-size:7.5pt; color:#6B7280;'>{esc(_DISP_CAT.get(_t.get('categoria', ''), _t.get('categoria', '')))} | {esc(_t.get('dominio', ''))}</span></td>"
                            f"<td style='font-size:8pt;'>{esc(str(_t.get('recomendacion', ''))[:140])}</td>"
                            f"<td class='num'>{_sla.get(pr, '--')}</td></tr>")
-    top5_html = (f"<div class='section-sub' style='page-break-before:always;'>Priorización inmediata -- Top 5</div>"
-                 f"<table class='data'><thead><tr><th>#</th><th>Pri.</th><th>Hallazgo</th><th>Accion inmediata</th><th>SLA</th></tr></thead>"
+    top5_html = (f"<div class='section-sub' style='page-break-before:always;'>Priorización inmediata — Top 5</div>"
+                 f"<table class='data'><thead><tr><th>#</th><th>Pri.</th><th>Hallazgo</th><th>Acción inmediata</th><th>SLA</th></tr></thead>"
                  f"<tbody>{top5_rows or '<tr><td colspan=5>Sin hallazgos priorizables.</td></tr>'}</tbody></table>"
-                 f"<div style='font-size:7pt; color:#6B7280;'>SLA: P1 = 7 días, P2 = 30 días, P3 = 60 días, P4 = 90 días. Detalle completo en sección 13.</div>")
+                 f"<div style='font-size:7pt; color:#6B7280;'>SLA: P1 = 7 días, P2 = 30 días, P3 = 60 días, P4 = 90 días. Detalle completo en la sección 10.</div>")
 
     # Detalle hallazgos cards (alineados con severidad/prioridad B7 cuando coinciden)
     _b7_titles = {}
     if _b7_issues:
         for _it in _b7_issues:
             _b7_titles[_norm(_it.get("title", ""))] = (str(_it.get("sev", "")), {"ALTA": "P1", "MEDIA": "P2", "BAJA": "P3"}.get(str(_it.get("sev", "")), "P4"))
-    cards = ""
+    cards_impact = ""
+    cards_context = ""
     for f in all_findings:
         _sev = f["severidad"]
         _prio = f["prioridad"]
@@ -3319,9 +3522,9 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
                 break
         f["severidad"] = _sev
         f["prioridad"] = _prio
-        cards += f"""
+        _card_html = f"""
         <div class="find-card" id="hallazgo-{esc(str(f.get('num', '?')))}">
-          <div class="fc-hdr"><span style="font-weight:800; color:#173B67;">#{f.get('num', '?')} {esc(f.get('id',''))}</span><span class="s-badge {_bcls(f['severidad'])}">{esc(_DISP_SEV.get(f['severidad'], f['severidad']))}</span><span style="font-weight:700; color:#173B67;">{esc(_DISP_CAT.get(f['categoria'], f['categoria']))}</span><span style="flex:1;">{esc(f['dominio'])}</span></div>
+          <div class="fc-hdr"><span style="font-weight:800; color:#173B67;">#{f.get('num', '?')} {esc(f.get('id',''))}</span><span class="s-badge {_bcls(f['severidad'])}">{esc(_DISP_SEV.get(f['severidad'], f['severidad']))}</span><span style="font-weight:700; color:#173B67;">{esc(_DISP_CAT.get(f['categoria'], f['categoria']))}</span><span style="flex:1;">{esc(f['dominio'])}</span>{_oasm.render_lifecycle_badge(f, domain=f['dominio']) if _oasm else ''}</div>
           <div class="fc-body">
             <div class="fc-row"><div class="fc-label">Título</div><div class="fc-value"><strong>{esc(f['titulo'])}</strong></div></div>
             <div class="fc-row"><div class="fc-label">Explicación</div><div class="fc-value">{esc(f['explicacion'])}</div></div>
@@ -3331,31 +3534,25 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
             <div class="fc-row"><div class="fc-label">Riesgo</div><div class="fc-value">{esc(f['riesgo'])}</div></div>
             <div class="fc-row"><div class="fc-label">Recomendación</div><div class="fc-value">{esc(f['recomendacion'])}</div></div>
             <div class="fc-row"><div class="fc-label">Prioridad</div><div class="fc-value">{esc(f['prioridad'])} | Estado: {esc(f['estado'])} | Confianza: <strong>{esc(f.get('confidence','MEDIUM'))}</strong></div></div>
+            <div class="fc-row"><div class="fc-label">Threat Level (SSC)</div><div class="fc-value"><strong>{esc(_ssc_threat_level(f))}</strong></div></div>
             <div class="fc-row"><div class="fc-label">Evidencia</div><div class="fc-value" style="font-size:7.5pt;">Fuente: {esc(f.get('source','ASM scan'))} ({esc(str(f.get('timestamp',''))[:16])}) → Regla: {esc(f.get('rule','B6'))} ({esc(f.get('methodology_version', FORMULA_VERSION))}) → Hallazgo {esc(f.get('id',''))} → Impacto scores: {esc(f.get('mueve_a','—'))}</div></div>
             {f"<div class='fc-row'><div class='fc-label'>Mapeo</div><div class='fc-value' style='font-size:7.5pt;'>{esc(f['mapeo'])}</div></div>" if f.get('mapeo') else ""}
           </div>
         </div>"""
+        if (f.get("mueve_a") or "—").strip() == "—":
+            cards_context += _card_html
+        else:
+            cards_impact += _card_html
+    _n_imp = sum(1 for f in all_findings if (f.get("mueve_a") or "—").strip() != "—")
+    _n_ctx = len(all_findings) - _n_imp
+    cards_sec10 = ""
+    if cards_impact:
+        cards_sec10 += f"<div class='section-sub'>Con impacto en scores ({_n_imp})</div>" + cards_impact
+    if cards_context:
+        cards_sec10 += f"<div class='section-sub'>Contexto informativo — no restan puntos ({_n_ctx})</div>" + cards_context
+    cards = cards_sec10
 
-    # Recomendaciones por prioridad
-    def rec_list(prio):
-        items = [f for f in all_findings if f["prioridad"] == prio][:8]
-        if not items:
-            return "<div class='info-box'>Sin recomendaciones en este plazo para los datos actuales.</div>"
-        return "".join(f"<div class='info-box'><strong>{esc(f['titulo'])}</strong><br>{esc(f['recomendacion'])}<br><span style='font-size:8pt;'>Factor: {esc(f['categoria'])} | Plazo: {'0-7 días' if prio=='P1' else '8-30 días' if prio=='P2' else '31-60 días' if prio=='P3' else 'Mejora continua'}</span></div>" for f in items)
-
-    # Anexos
-    san_all = p0.get("san_list") or []
-    san_rows = "".join(f"<tr><td>{esc(dom0)}</td><td>{esc(s)}</td></tr>" for s in san_all[:20]) or f"<tr><td>{esc(dom0)}</td><td>Sin SAN listados</td></tr>"
-    ct_list = subs_all[:40]
-    ct_html = ", ".join(esc(s) for s in ct_list) or "Sin subdominios CT"
-    raw_hdrs = "<br>".join(f"{esc(k)}: {esc(v)[:120]}" for k, v in list(h0.items())[:14]) or "Sin cabeceras"
-    try:
-        import json as _j
-        idb = ((p0.get("external") or {}).get("internetdb")) or {}
-        exp = ((p0.get("external") or {}).get("shodan_exposure")) or {}
-    except Exception:
-        idb, exp = {}, {}
-    anexo_e = f"=== InternetDB ===<br>dominio: {esc(dom0)}<br>ips: {esc(_j.dumps(idb)[:400] if idb else str(ips[:2]))}<br>=== Exposure ===<br>ip_count: {len(ips)}<br>puertos_expuestos: {n_ports}<br>total_cves: {n_vuln}"
+    # Anexos (solo E y F; los dumps crudos A-D se eliminaron del informe)
 
     # Bloques B7 (estructura/valores/estilo íntegros, sin portada B7)
     _b7_css = _B7MOD.CSS if _B7MOD is not None else ""
@@ -3365,57 +3562,15 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
         b7_overview = b7_overview.replace('<h2 class="sec">Vision general del Scorecard</h2>', '<h2 class="sec">4. Overall Score (Scorecard style)</h2>', 1)
         b7_audit = _render_b7_audit(_b7_by, _b7_scores, overall, dom0, _b7_sector_en, _b7p).replace(
         '<h2 class="sec">Puntuación Global — Desglose Auditable</h2>',
-        '<h2 class="sec">5. Puntuación Global — Desglose Auditable</h2>', 1)
+        '<h2 class="sec">4.1 Puntuación Global — Desglose Auditable</h2>', 1)
         b7_action = _bid(_B7MOD.render_action_items(_b7_by), "sec-b7accion").replace(
         '<h2 class="sec">Elementos de accion</h2>',
-        '<h2 class="sec">6. Elementos de acción B7</h2>', 1)
-        b7_mods = "".join(_bid(_B7MOD.render_module(k, n, d, int(_b7_scores.get(k, 100)), _b7_by.get(k, [])), f"sec-b7mod-{k}") for k, n, d in _B7MOD.SSC_FACTORS)
+        '<h2 class="sec">4.2 Elementos de acción B7</h2>', 1)
     else:
-        b7_overview = b7_audit = b7_action = b7_mods = ""
+        b7_overview = b7_audit = b7_action = ""
 
-# Panel Scorecard B5 (header + Overall + Threats + cards; sin duplicar §4)
-    try:
-        from generate_b5_unified_report import render_scorecard_exact as _b5_sc_exact
-    except Exception:
-        _b5_sc_exact = None
-
-    b5_scorecard = ""
-    if _b5_sc_exact is not None and providers:
-        try:
-            _pf = [f for f in all_findings if f.get("dominio") == p0.get("domain", "")]
-            try:
-                _pprev = prev_factor_scores(p0.get("domain", "")) or None
-            except Exception:
-                _pprev = None
-            _full = _b5_sc_exact(p0, analista=analista_show or "@eduingt",
-                                 org=p0.get("name") or p0.get("domain", ""),
-                                 generated=gen, findings=_pf, prev_scores=_pprev)
-            _cut = '<div style="margin:0 16px 12px; background:#fff; border:1px solid #D9DEE3; border-radius:8px; padding:10px; page-break-before:always;">'
-            if _cut in _full:
-                _full = _full.split(_cut)[0].rstrip() + "</section>"
-            b5_scorecard = _full
-        except Exception:
-            b5_scorecard = ""
-
-    b5_scorecard = ""
-    if _b5_sc_exact and providers:
-        try:
-            _full = _b5_sc_exact(p0, analista=analista_show or "@eduingt",
-                                           org=p0.get("name") or p0.get("domain", ""),
-                                           generated=gen, findings=_pf, prev_scores=_pprev)
-            _cut = '<div style="margin:0 16px 12px; background:#fff; border:1px solid #D9DEE3; border-radius:8px; padding:10px; page-break-before:always;">'
-            if _cut in _full:
-                _full = _full.split(_cut)[0].rstrip() + "</section>"
-            b5_scorecard = _full
-        except Exception:
-            b5_scorecard = ""
-
-    try:
-        import generate_b5_unified_report as _B5MOD
-        _precia_threats = _B5MOD._precia_threats
-    except Exception:
-        _precia_threats = None
-
+    # NOTA: no reasignar _precia_threats aquí (es global del módulo; reasignarlo
+    # convertía el nombre en local y rompía su lectura anterior con UnboundLocalError).
     _threats = int(_precia_threats(p0, _b7_scores)) if _precia_threats else 0
     _industry = _b7_sector_en if _b7_sector_en and _b7_sector_en != "—" else "Technology"
     _overall_header = (
@@ -3431,12 +3586,6 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
     b7_overview = b7_overview.replace('<h2 class="sec">Vision general del Scorecard</h2>',
                                        f'<h2 class="sec">4. Overall Score (Scorecard style)</h2>' + _overall_header, 1)
 
-    # Insertar panel B5 dentro de la sección 4 (justo después del header Overall Score)
-    if b5_scorecard:
-        b7_overview = b7_overview.replace('<h2 class="sec">4. Overall Score (Scorecard style)</h2>',
-            '<h2 class="sec">4. Overall Score (Scorecard style)</h2>'
-            + b5_scorecard, 1)
-
     html = f"""<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><title>Informe Unificado B6 - {esc(dom0)}</title><style>{CSS}</style><style>{_b7_css}</style></head>
 <body><div class="page">
@@ -3449,14 +3598,14 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
     <div class="org-name">{esc(dom0)}</div>
   </div>
   <div class="cover-meta"><table>
-    <tr><td>Fecha de generacion</td><td>{esc(fecha)}</td></tr>
+    <tr><td>Fecha de generación</td><td>{esc(fecha)}</td></tr>
     <tr><td>Analista responsable</td><td>{esc(analista_show)}</td></tr>
-    <tr><td>Organizacion emisora</td><td>{esc(org_show)}</td></tr>
+    <tr><td>Organización emisora</td><td>{esc(org_show)}</td></tr>
     <tr><td>Dominio evaluado</td><td>{esc(dom0)}</td></tr>
     <tr><td>Tipo de prueba</td><td>{esc(test_type)}</td></tr>
-    <tr><td><strong>PUNTUACIÓN GLOBAL (Overall)</strong></td><td><strong>{overall}/100</strong> comparativo sectorial</td></tr>
-    <tr><td>Factor Score (vista complementaria)</td><td>{score_general}/100 promedio simple 10 factores</td></tr>
-    <tr><td>Domain Técnico (vista complementaria)</td><td>{dscore}/100 — higiene técnica (heurística 25 controles)</td></tr>
+    <tr><td><strong>PUNTUACIÓN GLOBAL (Overall)</strong></td><td><strong>{overall}/100</strong> benchmark B7 comparativo sectorial</td></tr>
+    <tr><td>Puntuación por dominio</td><td>{dscore}/100 higiene técnica (domain_score)</td></tr>
+    <tr><td>Factor Score (vista complementaria)</td><td>{score_general}/100 consolidación simple 10 factores</td></tr>
   </table></div>
   <div class="cover-footer"><span>Dominio: {esc(dom0)} | Preparado: {esc(fecha)}</span><span>Página 1</span></div>
 </div>
@@ -3466,98 +3615,98 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
 <div class="toc-row"><span class="toc-num">2</span><a class="toc-title" href="#sec-resumen">Resumen Ejecutivo</a><span class="toc-pg" data-pg="sec-resumen">–</span></div>
 <div class="toc-row"><span class="toc-num">3</span><a class="toc-title" href="#sec-tablero">Tablero ejecutivo</a><span class="toc-pg" data-pg="sec-tablero">–</span></div>
 <div class="toc-row"><span class="toc-num">4</span><a class="toc-title" href="#sec-b7ov">Overall Score (Scorecard style)</a><span class="toc-pg" data-pg="sec-b7ov">–</span></div>
-<div class="toc-row"><span class="toc-num">5</span><a class="toc-title" href="#sec-b7audit">Puntuación Global — Desglose Auditable</a><span class="toc-pg" data-pg="sec-b7audit">–</span></div>
-<div class="toc-row"><span class="toc-num">6</span><a class="toc-title" href="#sec-b7accion">Elementos de acción B7</a><span class="toc-pg" data-pg="sec-b7accion">–</span></div>
-<div class="toc-row"><span class="toc-num">7</span><a class="toc-title" href="#sec-b7mod-appsec">Detalle por factor B7</a><span class="toc-pg" data-pg="sec-b7mod-appsec">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.1</span><a class="toc-title" href="#sec-b7mod-appsec">Seguridad de aplicación web</a><span class="toc-pg" data-pg="sec-b7mod-appsec">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.2</span><a class="toc-title" href="#sec-b7mod-cubit">Cubit Score</a><span class="toc-pg" data-pg="sec-b7mod-cubit">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.3</span><a class="toc-title" href="#sec-b7mod-dns">Estado de DNS</a><span class="toc-pg" data-pg="sec-b7mod-dns">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.4</span><a class="toc-title" href="#sec-b7mod-endpoint">Seguridad de puntos de conexión</a><span class="toc-pg" data-pg="sec-b7mod-endpoint">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.5</span><a class="toc-title" href="#sec-b7mod-chatter">Hacker Chatter</a><span class="toc-pg" data-pg="sec-b7mod-chatter">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.6</span><a class="toc-title" href="#sec-b7mod-iprep">Reputación de IP</a><span class="toc-pg" data-pg="sec-b7mod-iprep">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.7</span><a class="toc-title" href="#sec-b7mod-leak">Filtración de información</a><span class="toc-pg" data-pg="sec-b7mod-leak">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.8</span><a class="toc-title" href="#sec-b7mod-network">Seguridad de red</a><span class="toc-pg" data-pg="sec-b7mod-network">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.9</span><a class="toc-title" href="#sec-b7mod-patching">Cadencia de revisiones</a><span class="toc-pg" data-pg="sec-b7mod-patching">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">7.10</span><a class="toc-title" href="#sec-b7mod-social">Ingeniería social</a><span class="toc-pg" data-pg="sec-b7mod-social">–</span></div>
-<div class="toc-row"><span class="toc-num">8</span><a class="toc-title" href="#sec-score">Factor Score / Puntuación General</a><span class="toc-pg" data-pg="sec-score">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">8.1</span><a class="toc-title" href="#sec-factores">Factores de Riesgo</a><span class="toc-pg" data-pg="sec-factores">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">8.2</span><a class="toc-title" href="#sec-historial">Historial del Score</a><span class="toc-pg" data-pg="sec-historial">–</span></div>
-<div class="toc-row"><span class="toc-num">9</span><a class="toc-title" href="#sec-domain">Domain Score (Tecnico)</a><span class="toc-pg" data-pg="sec-domain">–</span></div>
-<div class="toc-row"><span class="toc-num">10</span><a class="toc-title" href="#sec-pasivo">Análisis Pasivo / Activo</a><span class="toc-pg" data-pg="sec-pasivo">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">10.1</span><a class="toc-title" href="#sec-inventario">Inventario de Activos</a><span class="toc-pg" data-pg="sec-inventario">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">10.2</span><a class="toc-title" href="#sec-superficie-hist">Evolución de Superficie</a><span class="toc-pg" data-pg="sec-superficie-hist">–</span></div>
-<div class="toc-row"><span class="toc-num">11</span><a class="toc-title" href="#sec-matriz">Matriz de Riesgo y Controles</a><span class="toc-pg" data-pg="sec-matriz">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">11.1</span><a class="toc-title" href="#sec-agregados">Hallazgos Agregados</a><span class="toc-pg" data-pg="sec-agregados">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">11.2</span><a class="toc-title" href="#sec-osint">OSINT Pasivo</a><span class="toc-pg" data-pg="sec-osint">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">11.3</span><a class="toc-title" href="#sec-matriz-asm">Matriz de controles ASM</a><span class="toc-pg" data-pg="sec-matriz-asm">–</span></div>
-<div class="toc-row"><span class="toc-num">12</span><a class="toc-title" href="#sec-enriquecimiento">Enriquecimiento y Superficie Detallada</a><span class="toc-pg" data-pg="sec-enriquecimiento">–</span></div>
-<div class="toc-row"><span class="toc-num">13</span><a class="toc-title" href="#sec-hallazgos">Detalle de Hallazgos</a><span class="toc-pg" data-pg="sec-hallazgos">–</span></div>
-<div class="toc-row"><span class="toc-num">14</span><a class="toc-title" href="#sec-recomendaciones">Recomendaciones Priorizadas</a><span class="toc-pg" data-pg="sec-recomendaciones">–</span></div>
-<div class="toc-row"><span class="toc-num">15</span><a class="toc-title" href="#sec-fuentes">Fuentes y Referencias</a><span class="toc-pg" data-pg="sec-fuentes">–</span></div>
-<div class="toc-row"><span class="toc-num">16</span><a class="toc-title" href="#sec-glosario">Glosario</a><span class="toc-pg" data-pg="sec-glosario">–</span></div>
-<div class="toc-row"><span class="toc-num">17</span><a class="toc-title" href="#sec-anexos">Anexos</a><span class="toc-pg" data-pg="sec-anexos">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">A</span><a class="toc-title" href="#sec-anexo-a">SANs completos</a><span class="toc-pg" data-pg="sec-anexo-a">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">B</span><a class="toc-title" href="#sec-anexo-b">CT Logs</a><span class="toc-pg" data-pg="sec-anexo-b">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">C</span><a class="toc-title" href="#sec-anexo-c">Headers HTTP crudos</a><span class="toc-pg" data-pg="sec-anexo-c">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">D</span><a class="toc-title" href="#sec-anexo-d">Shodan InternetDB + Exposure</a><span class="toc-pg" data-pg="sec-anexo-d">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">E</span><a class="toc-title" href="#sec-anexo-e">Notas metodologicas</a><span class="toc-pg" data-pg="sec-anexo-e">–</span></div>
-<div class="toc-row toc-sub"><span class="toc-num">F</span><a class="toc-title" href="#sec-anexo-f">Nota metodologica de scores</a><span class="toc-pg" data-pg="sec-anexo-f">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">4.1</span><a class="toc-title" href="#sec-b7audit">Puntuación Global — Desglose Auditable</a><span class="toc-pg" data-pg="sec-b7audit">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">4.2</span><a class="toc-title" href="#sec-b7accion">Elementos de acción B7</a><span class="toc-pg" data-pg="sec-b7accion">–</span></div>
+<div class="toc-row"><span class="toc-num">5</span><a class="toc-title" href="#sec-domain">Puntuación por dominio (higiene técnica)</a><span class="toc-pg" data-pg="sec-domain">–</span></div>
+<div class="toc-row"><span class="toc-num">6</span><a class="toc-title" href="#sec-score">Factor Score / consolidación</a><span class="toc-pg" data-pg="sec-score">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">6.1</span><a class="toc-title" href="#sec-factores">Factores de Riesgo</a><span class="toc-pg" data-pg="sec-factores">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">6.2</span><a class="toc-title" href="#sec-historial">Historial del Score</a><span class="toc-pg" data-pg="sec-historial">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">6.3</span><a class="toc-title" href="#sec-oasm">Enriquecimiento (tendencia y superficie)</a><span class="toc-pg" data-pg="sec-oasm">–</span></div>
+<div class="toc-row"><span class="toc-num">7</span><a class="toc-title" href="#sec-pasivo">Análisis Pasivo / Activo</a><span class="toc-pg" data-pg="sec-pasivo">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">7.1</span><a class="toc-title" href="#sec-inventario">Inventario de Activos</a><span class="toc-pg" data-pg="sec-inventario">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">7.2</span><a class="toc-title" href="#sec-superficie-hist">Evolución de Superficie</a><span class="toc-pg" data-pg="sec-superficie-hist">–</span></div>
+<div class="toc-row"><span class="toc-num">8</span><a class="toc-title" href="#sec-matriz">Matriz de Riesgo y Controles</a><span class="toc-pg" data-pg="sec-matriz">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">8.1</span><a class="toc-title" href="#sec-osint">OSINT Pasivo</a><span class="toc-pg" data-pg="sec-osint">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">8.2</span><a class="toc-title" href="#sec-matriz-asm">Matriz de controles ASM</a><span class="toc-pg" data-pg="sec-matriz-asm">–</span></div>
+<div class="toc-row"><span class="toc-num">9</span><a class="toc-title" href="#sec-enriquecimiento">Enriquecimiento y Superficie Detallada</a><span class="toc-pg" data-pg="sec-enriquecimiento">–</span></div>
+<div class="toc-row"><span class="toc-num">10</span><a class="toc-title" href="#sec-hallazgos">Detalle de Hallazgos</a><span class="toc-pg" data-pg="sec-hallazgos">–</span></div>
+<div class="toc-row"><span class="toc-num">11</span><a class="toc-title" href="#sec-fuentes">Fuentes y Referencias</a><span class="toc-pg" data-pg="sec-fuentes">–</span></div>
+<div class="toc-row"><span class="toc-num">12</span><a class="toc-title" href="#sec-anexos">Anexos</a><span class="toc-pg" data-pg="sec-anexos">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">E</span><a class="toc-title" href="#sec-anexo-e">Notas metodológicas</a><span class="toc-pg" data-pg="sec-anexo-e">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">F</span><a class="toc-title" href="#sec-anexo-f">Nota metodológica de scores</a><span class="toc-pg" data-pg="sec-anexo-f">–</span></div>
+<div class="toc-row"><span class="toc-num">13</span><a class="toc-title" href="#sec-legal">Nota legal</a><span class="toc-pg" data-pg="sec-legal">–</span></div>
 </div>
 
-<div class="sec" id="sec-acerca"><div class="section-title">1. Acerca de este informe</div>
-<div class="info-box">El presente documento constituye una <strong>captura puntual del estado de seguridad</strong> del dominio evaluado ({esc(dom0)}), basada en técnicas de escaneo activo y pasivo, análisis de configuraciones expuestas, consulta a fuentes abiertas de inteligencia de amenazas y motores de busqueda especializados.<br><br>
-<strong>Este informe no debe interpretarse como una prueba de penetracion</strong> ni como una evaluación de seguridad definitiva. Los resultados reflejan la información disponible al momento del escaneo y deben ser <strong>validados por el equipo técnico responsable</strong> antes de tomar decisiones operativas o contractuales. Sirve como herramienta para <strong>priorizar acciones de mejora</strong> en la postura de seguridad del proveedor o tercero evaluado.</div>
+<div class="sec" id="sec-acerca" style="page-break-before:always;"><div class="section-title">1. Acerca de este informe</div>
+<div class="info-box">El presente documento constituye una <strong>captura puntual del estado de seguridad</strong> del dominio evaluado ({esc(dom0)}), basada en técnicas de escaneo activo y pasivo, análisis de configuraciones expuestas, consulta a fuentes abiertas de inteligencia de amenazas y motores de búsqueda especializados.<br><br>
+<strong>Este informe no debe interpretarse como una prueba de penetración</strong> ni como una evaluación de seguridad definitiva. Los resultados reflejan la información disponible al momento del escaneo y deben ser <strong>validados por el equipo técnico responsable</strong> antes de tomar decisiones operativas o contractuales. Sirve como herramienta para <strong>priorizar acciones de mejora</strong> en la postura de seguridad del proveedor o tercero evaluado.</div>
 </div>
 
-<div class="sec" id="sec-resumen"><div class="section-title">2. Resumen Ejecutivo</div>
-<div class="info-box">Se realizo una <strong>evaluación integral de la postura de seguridad</strong> de {esc(dom0)} con <strong>métrica oficial Puntuación Global (Overall Score)</strong> — promedio ponderado de 10 factores (sección 3) — y trazabilidad a hallazgos sección 13. El análisis combina <strong>evaluación {esc(test_type)}</strong>, OSINT y bases de vulnerabilidades/filtraciones.</div>
-<div class="info-box"><span style="font-size:8pt; font-weight:800; letter-spacing:.06em; color:#2F6F9F;">HALLAZGOS PRINCIPALES</span> <span style="font-size:9pt; color:#4B6563;">Puntuación Global {overall}/100 — {esc(_ov_industry)} { _ov_avg}/100 · {len(_b7_issues) if _b7_issues else len(all_findings)} issues</span>
+<div class="sec" id="sec-resumen" style="page-break-before:always;"><div class="section-title">2. Resumen Ejecutivo</div>
+<div class="info-box">Se realizó una <strong>evaluación integral de la postura de seguridad</strong> de {esc(dom0)} con <strong>métrica oficial Puntuación Global (Overall Score)</strong> — promedio simple de 10 factores (sección 4) — y trazabilidad a hallazgos en la sección 10. El análisis combina <strong>evaluación {esc(test_type)}</strong>, OSINT y bases de vulnerabilidades/filtraciones.</div>
+<div class="info-box"><span style="font-size:8pt; font-weight:800; letter-spacing:.06em; color:#2F6F9F;">HALLAZGOS PRINCIPALES</span> <span style="font-size:9pt; color:#4B6563;">Puntuación Global {overall}/100 — {esc(_ov_industry)} { _ov_avg}/100 · {len(all_findings)} tarjetas · {len(_b7_issues)} issues B7 con impacto · {_n_imp} tarjetas con impacto</span>
 <ul style="margin:8px 0 4px 18px; font-size:9pt; color:#374151; line-height:1.7;">
-<li><span style="color:#173B67;">&#8226;</span> <strong style="color:#173B67;">Puntuación Global (Overall Score):</strong> {overall}/100 vs media sectorial {esc(_ov_industry)} {_ov_avg}/100 — {"por encima de la media" if overall >= _ov_avg else "por debajo de la media"} ({overall - _ov_avg:+g}), postura {"sólida" if overall >= 90 else "buena" if overall >= 80 else "aceptable" if overall >= 70 else "deficiente"}. {"Sin hallazgos críticos abiertos." if n_crit == 0 else f"{n_crit} crítico(s) abiertos."} Incidencias Overall: {sum(_ov_inc.values()) if _ov_inc else 0} · Threat Indicators: {_ov_threats}.</li>
-<li><span style="color:#173B67;">&#8226;</span> <strong style="color:#173B67;">Hallazgos:</strong> {len(_b7_issues) if _b7_issues else len(all_findings)} issues con impacto ({n_crit} críticos, {n_alta} altos, {n_med} medios, {n_baja} bajos, {n_info} informativos) — distribución sección 2. Factores de Puntuación Global que más impactan: {_ov_impact_txt}.</li>
-<li><span style="color:#173B67;">&#8226;</span> <strong style="color:#173B67;">Factores clave Overall (Top 3 más bajos):</strong> {_weak_txt} — ver desglose auditable en sección 8 y deducciones sección 13. Benchmark: Network/DNS/Patching/IPRep/AppSec ×1.2; resto ×1.0/0.9/0.8. Fórmula {esc(FORMULA_VERSION)}.</li>
-<li><span style="color:#2E7D32;">&#8226;</span> <strong style="color:#2E7D32;">Superficie & exposición:</strong> {len(subs_all)} en scope (observados {_obs_count} incluyendo {len(san_all)} SANs, {n_brute} brute, {n_ct} CT) en {len(providers)} proveedor(es); {n_vuln} vulns OSV, {n_leak} filtraciones, {n_ports} puerto(s) abierto(s), {n_take} takeover, {n_typo} typos. Definiciones: observados=cualquier fuente, en scope=subdomains+crt, scored=en scope.</li>
+<li><span style="color:#173B67;">&#8226;</span> <strong style="color:#173B67;">Puntuación Global (Overall Score):</strong> {overall}/100 vs media sectorial {esc(_ov_industry)} {_ov_avg}/100 — {"por encima de la media" if overall >= _ov_avg else "por debajo de la media"} ({overall - _ov_avg:+g}), postura {"sólida" if overall >= 90 else "buena" if overall >= 80 else "aceptable" if overall >= 70 else "deficiente"}. {"Sin hallazgos críticos abiertos." if m_crit == 0 else f"{m_crit} crítico(s) abiertos."} Incidencias Overall: {sum(_ov_inc.values()) if _ov_inc else 0} · Threat Indicators: {_ov_threats}.</li>
+<li><span style="color:#173B67;">&#8226;</span> <strong style="color:#173B67;">Hallazgos:</strong> {len(all_findings)} documentados ({m_crit} {"crítico" if m_crit == 1 else "críticos"}, {m_alta} {"alto" if m_alta == 1 else "altos"}, {m_med} {"medio" if m_med == 1 else "medios"}, {m_baja} {"bajo" if m_baja == 1 else "bajos"}, {m_info} {"informativo" if m_info == 1 else "informativos"}), de las cuales {_n_imp} con impacto en scores y {_n_ctx} solo informativas; {len(_b7_issues)} issues B7 con impacto en el Overall — distribución por severidad en el Tablero (sección 3). Las {sum(1 for f in all_findings if (f.get('mueve_a') or '—').strip() == '—')} tarjetas restantes son contexto informativo (Impacto scores: —) y no restan puntos. Factores de Puntuación Global que más impactan: {_ov_impact_txt}.</li>
+<li><span style="color:#173B67;">&#8226;</span> <strong style="color:#173B67;">Factores clave Overall (Top 3 más bajos):</strong> {_weak_txt} — ver desglose auditable en la sección 4.1 y deducciones en la sección 10. Benchmark sin pesos por factor (SSC v3.0). Fórmula {esc(FORMULA_VERSION)}.</li>
+<li><span style="color:#2E7D32;">&#8226;</span> <strong style="color:#2E7D32;">Superficie y exposición:</strong> {len(subs_all)} en scope (observados {_obs_count} incluyendo {len(san_all)} SANs, {n_brute} por fuerza bruta, {n_ct} CT) en {len(providers)} {"proveedor" if len(providers) == 1 else "proveedores"}; {n_vuln} vulnerabilidades OSV, {n_leak} filtraciones, {n_ports} {"puerto abierto" if n_ports == 1 else "puertos abiertos"}, {n_take} takeover, {n_typo} typos. Definiciones: observados=cualquier fuente, en scope=subdomains+crt, scored=en scope. 0 = no detectado por las fuentes utilizadas, no garantía de ausencia.</li>
 </ul>
 <div style="margin-top:8px;"><span style="display:inline-block; background:{risk_bg}; color:{risk_col}; border:1px solid {risk_col}; border-radius:4px; font-size:9pt; font-weight:800; padding:3px 10px;">{risk_lbl}</span> <span style="font-size:7.5pt; color:#6B7280;">Clasificación: Confidencial — Solo para uso interno · Fuentes: DNS, CT logs, OSINT, vulndb, Nuclei/Gobuster</span></div>
 </div>
 {top5_html}
-<div style="font-size:6.5px; color:#9CA3AF; padding:0 50px;">Metodologia: ASM ligero (NIST CSF PR.DS/PR.AC, ISO 27001 A.8.23/A.8.26, PCI DSS Req 4, CIS 03/04/13, OWASP Top 10) alineada a métrica oficial Puntuación Global sección 4 (promedio ponderado 10 factores × pesos). No sustituye pentest ni auditoria de cumplimiento.</div>
-<div style="font-size:7.5pt; color:#6B7280; margin:8px 0;">Métrica oficial: <strong>Puntuación Global (Overall Score)</strong> — benchmark ponderado (sección 4) con trazabilidad sección 12; <strong>Factor Score (sección 7)</strong> y <strong>Domain Score (sección 8)</strong> son vistas complementarias. Detalle Tablero sección 3. Ver <strong>Anexo F — Nota metodologica de scores</strong>.</div>
-<div class="sec" id="sec-tablero"><div class="section-title" style="border-top:3px solid #173B67; padding-top:10px;">3. Tablero ejecutivo — Overall Score (Puntuación Global)</div>
-<div class="info-box" style="font-size:8pt;">Este tablero resume la <strong>Puntuación Global (Overall Score)</strong> — promedio ponderado de 10 factores (Network/DNS/Patching/IPRep/AppSec ×1.2). Es la métrica oficial del informe (detalle Scorecard-style en sección 3); Factor Score (sec 7) y Domain Score (sec 8) son vistas complementarias. Detalle y fórmula en sección 3.</div>
+<div style="font-size:6.5px; color:#9CA3AF; padding:0 50px;">Metodología: ASM ligero (NIST CSF PR.DS/PR.AC, ISO 27001 A.8.23/A.8.26, PCI DSS Req 4, CIS 03/04/13, OWASP Top 10) alineada a la métrica oficial Puntuación Global de la sección 4 (promedio simple de 10 factores, sin pesos). No sustituye pentest ni auditoría de cumplimiento.</div>
+<div style="font-size:7.5pt; color:#6B7280; margin:8px 0;">Métrica oficial: <strong>Puntuación Global (Overall Score)</strong> — benchmark B7 (sección 4) con trazabilidad en la sección 10; <strong>Puntuación por dominio (sección 5)</strong> mide higiene técnica y <strong>Factor Score (sección 6)</strong> consolida 10 factores, ambos con heurística B5/B6. Detalle en el Tablero (sección 3). Ver <strong>Anexo F — Nota metodológica de scores</strong>.</div>
+<div class="sec" id="sec-tablero" style="page-break-before:always;"><div class="section-title" style="border-top:3px solid #173B67; padding-top:10px;">3. Tablero ejecutivo — Overall Score (Puntuación Global)</div>
+<div class="info-box" style="font-size:8pt;">Este tablero resume la <strong>Puntuación Global (Overall Score)</strong> — promedio simple de 10 factores B7, sin pesos (metodología SSC v3.0). Es la métrica oficial del informe (detalle Scorecard-style en la sección 4). Debajo: <strong>Puntuación por dominio (sec. 5)</strong>, higiene técnica por proveedor, y <strong>Factor Score (sec. 6)</strong>, consolidación simple de 10 factores con heurística B5/B6. Cada métrica usa su motor (ver Anexo F).</div>
 <div class="kpi-row">
 <div class="kpi-card"><div class="kpi-num" style="color:#173B67;">{overall}</div><div class="kpi-lbl">Puntuación<br>Global</div></div>
-<div class="kpi-card"><div class="kpi-num" style="color:#173B67;">{len(_b7_issues) if _b7_issues else len(all_findings)}</div><div class="kpi-lbl">Hallazgos</div></div>
-<div class="kpi-card"><div class="kpi-num" style="color:#C62828;">{n_crit}</div><div class="kpi-lbl">Críticos</div></div>
-<div class="kpi-card"><div class="kpi-num" style="color:#EF6C00;">{n_alta}</div><div class="kpi-lbl">Altos</div></div>
-<div class="kpi-card"><div class="kpi-num" style="color:#F9A825;">{n_med}</div><div class="kpi-lbl">Medios</div></div>
-<div class="kpi-card"><div class="kpi-num" style="color:#2E7D32;">{n_baja}</div><div class="kpi-lbl">Bajos</div></div>
-<div class="kpi-card"><div class="kpi-num" style="color:#6B7280;">{n_info}</div><div class="kpi-lbl">Informativos</div></div>
+<div class="kpi-card"><div class="kpi-num" style="color:#173B67;">{len(all_findings)}</div><div class="kpi-lbl">Hallazgos</div></div>
+<div class="kpi-card"><div class="kpi-num" style="color:#C62828;">{m_crit}</div><div class="kpi-lbl">Críticos</div></div>
+<div class="kpi-card"><div class="kpi-num" style="color:#EF6C00;">{m_alta}</div><div class="kpi-lbl">Altos</div></div>
+<div class="kpi-card"><div class="kpi-num" style="color:#F9A825;">{m_med}</div><div class="kpi-lbl">Medios</div></div>
+<div class="kpi-card"><div class="kpi-num" style="color:#2E7D32;">{m_baja}</div><div class="kpi-lbl">Bajos</div></div>
+<div class="kpi-card"><div class="kpi-num" style="color:#6B7280;">{m_info}</div><div class="kpi-lbl">Informativos</div></div>
 </div>
 <div style="font-size:7pt; color:#6B7280; margin:6px 0;">Threat Indicators ({_ov_threats}): conteo crudo de evidencias — CSP + cookies + leaks + typos (c/u) + takeovers + puertos + vulns + nuclei + gobuster + IP-reputation (+2 si URLhaus malicioso). No resta del Overall; puede superar al nº de hallazgos (ej. 1 hallazgo de typos = N variantes).</div>
-<div style="font-size:7pt; color:#6B7280; margin:6px 0;">Incidencia = chequeo fallado del factor · Hallazgo = tarjeta §9 con evidencia y remediación (un hallazgo puede cubrir varias incidencias, ej. #7 Typosquatting).</div>
-<div class="exec-summary"><b class="lbl">Estado general (Puntuación Global):</b> La evaluación arroja un <strong>Puntuación Global de {overall}/100</strong> vs media sectorial <strong>{esc(_ov_industry)} {_ov_avg}/100</strong> — {"por encima de la media" if overall >= _ov_avg else "por debajo de la media"} ({overall - _ov_avg:+g}), postura {"sólida" if overall >= 90 else "buena" if overall >= 80 else "aceptable" if overall >= 70 else "deficiente"}.<br><br>
-<b class="lbl">Hallazgos principales:</b> Se identificaron <strong>{len(_b7_issues) if _b7_issues else len(all_findings)} issues con impacto</strong> ({n_crit} críticos, {n_alta} altos, {n_med} medios, {n_baja} bajos, {n_info} informativos). Los factores de Puntuación Global que más impactan el score son: {_ov_impact_txt}.<br><br>
-<b class="lbl">Factores clave (Top 3 más bajos Overall):</b> {_weak_txt} — ver desglose auditable en sección 8 y deducciones por hallazgo (sección 12). Incidencias totales Overall: {sum(_ov_inc.values()) if _ov_inc else 0} · Threat Indicators: {_ov_threats}.<br><br>
-<b class="lbl">Benchmark:</b> Network/DNS/Patching/IPRep/AppSec ponderan ×1.2 en el Overall; resto ×1.0/0.9/0.8. Fórmula {esc(FORMULA_VERSION)} ({esc(FORMULA_DATE)}).<br><br>
-<b class="lbl">Conclusion:</b> {"La postura de seguridad es satisfactoria y requiere monitoreo continuo. Se recomienda reevaluacion en 90 días." if overall >= 70 else "Se requiere remediación prioritaria de hallazgos críticos y altos. Se recomienda reevaluacion en 30 días."}</div>
-{delta_strip}
+<div style="font-size:7pt; color:#6B7280; margin:6px 0;">Incidencia = chequeo fallado del factor · Hallazgo = tarjeta §10 con evidencia y remediación (un hallazgo puede cubrir varias incidencias, ej. #7 Typosquatting).</div>
+
 <div class="gauge-wrap">
 <div class="gauge-box">{gauge_overall_svg}</div>
+<div class="gauge-box">{gauge_domain_svg}</div>
+<div class="gauge-box">{gauge_svg}</div>
 <div class="dist-box"><div class="dist-title">Distribución de hallazgos</div>
-<div class="dist-row"><span class="d-badge d-crit">CRÍTICOS</span><span class="d-count" style="color:#C62828;">{n_crit}</span></div>
-<div class="dist-row"><span class="d-badge d-alta">ALTOS</span><span class="d-count" style="color:#EF6C00;">{n_alta}</span></div>
-<div class="dist-row"><span class="d-badge d-media">MEDIOS</span><span class="d-count" style="color:#B8860B;">{n_med}</span></div>
-<div class="dist-row"><span class="d-badge d-baja">BAJOS</span><span class="d-count" style="color:#2E7D32;">{n_baja}</span></div>
-<div class="dist-row"><span class="d-badge d-info">INFORMATIVOS</span><span class="d-count" style="color:#2F6F9F;">{n_info}</span></div>
+<div class="dist-row"><span class="d-badge d-crit">CRÍTICOS</span><span class="d-count" style="color:#C62828;">{m_crit}</span></div>
+<div class="dist-row"><span class="d-badge d-alta">ALTOS</span><span class="d-count" style="color:#EF6C00;">{m_alta}</span></div>
+<div class="dist-row"><span class="d-badge d-media">MEDIOS</span><span class="d-count" style="color:#B8860B;">{m_med}</span></div>
+<div class="dist-row"><span class="d-badge d-baja">BAJOS</span><span class="d-count" style="color:#2E7D32;">{m_baja}</span></div>
+<div class="dist-row"><span class="d-badge d-info">INFORMATIVOS</span><span class="d-count" style="color:#2F6F9F;">{m_info}</span></div>
 </div>
 </div>
 </div>
 
-{b7_overview}{b7_audit}{b7_action}{b7_mods}
+{b7_overview}{b7_audit}{b7_action}
 
-<div class="sec" id="sec-score"><div class="section-title">7. Factor Score / Puntuación General (Negocio) — vista complementaria</div>
-<div class="info-box">El Scorecard califica la postura de seguridad en escala de <strong>A a F</strong>: <strong>A</strong> (90-100) postura solida, <strong>B</strong> (80-89) buena, <strong>C</strong> (70-79) aceptable, <strong>D</strong> (60-69) deficiente, <strong>F</strong> (&lt;60) critica. El factor score se calcula ponderando factores de riesgo.</div>
+<div class="sec" id="sec-domain" style="page-break-before:always;"><div class="section-title" style="border-top:3px solid #173B67; padding-top:10px;">5. Puntuación por dominio (higiene técnica)</div>
+<div style="display:flex; gap:24px; align-items:center; margin:10px 0; font-size:10pt;">
+<div style="flex:1;"><strong>Higiene técnica (domain_score)</strong></div>
+<div style="flex:1; text-align:center;">{dscore}/100</div>
+<div style="flex:1; text-align:right;"><strong>Motor:</strong> heurística B5/B6 por controles</div>
+</div>
+<div class="section-sub">Resumen por dominio</div>
+<div class="info-box">Promedio de higiene técnica por dominio: cada control parte de 100 y resta puntos por chequeo fallado. Detalle de controles del dominio evaluado en la tabla siguiente.</div>
+<table class="data"><thead><tr><th>Dominio</th><th>Domain Score</th><th>Grado</th></tr></thead><tbody>
+{_dom_hyg_rows}
+</tbody></table>
+<div class="section-sub">Controles de higiene — {esc(dom0)}</div>
+<table class="data"><thead><tr><th>Control</th><th>Regla</th><th>Referencia</th><th>Estado</th></tr></thead><tbody>
+{ds_rows}
+</tbody></table>
+<div class="info-box" style="font-size:7.5pt;">Puntuación por dominio (higiene), Factor Score (sec. 6) y Overall (sec. 4) usan cada uno su motor (ver Anexo F).</div>
+<div style="background:#fff; border:1px solid #D9DEE3; border-left:4px solid #2F6F9F; border-radius:6px; padding:12px 14px; margin:12px 0; font-size:9pt; color:#374151; line-height:1.65;"><strong>¿Cómo se calcula la puntuación?</strong> Cada control parte de <strong>100</strong> y resta puntos por cada chequeo fallado (domain_score, higiene técnica). {esc(ds_example)} Validado: <strong>100</strong> = sin deducciones (todo ok). Colores: <span style="color:#2E7D32;">■</span> ≥90 verde, <span style="color:#F9A825;">■</span> 70-89 amarillo, <span style="color:#EF6C00;">■</span> 60-69 naranja, <span style="color:#C62828;">■</span> &lt;60 rojo. Fórmula {esc(FORMULA_VERSION)} ({esc(FORMULA_DATE)}).</div>
+</div>
+
+<div class="sec" id="sec-score" style="page-break-before:always;"><div class="section-title">6. Factor Score / consolidación (Negocio) — vista complementaria</div>
+<div class="info-box">El Scorecard califica la postura de seguridad en escala de <strong>A a F</strong>: <strong>A</strong> (90-100) postura sólida, <strong>B</strong> (80-89) buena, <strong>C</strong> (70-79) aceptable, <strong>D</strong> (60-69) deficiente, <strong>F</strong> (&lt;60) crítica. El factor score se calcula ponderando factores de riesgo.</div>
 <div class="step-box">
 <div class="step"><span class="sn">1</span><div class="st">Validar huella digital</div></div>
 <div class="step"><span class="sn">2</span><div class="st">Revisar activos</div></div>
@@ -3572,155 +3721,98 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
 <div style="flex:1; display:flex; gap:10px;"><strong>Fecha de evaluación</strong><span>{esc(fecha)}</span></div>
 <div style="flex:1; display:flex; gap:10px;"><strong>Nivel de riesgo</strong><span class="{_lcls(score_general)}">{_letter(score_general)}</span></div>
 </div>
-<div class="section-sub" id="sec-factores">7.1 Factores de Riesgo/Factor Score</div>
-<div style="overflow-x:auto;"><table class="data"><thead><tr><th>Score</th><th>Factor de riesgo</th><th>Incidencias</th><th>Desglose</th><th>Ver sección 12</th></tr></thead><tbody>{frows}</tbody></table></div>
-<div style="background:#fff; border:1px solid #D9DEE3; border-left:4px solid #2F6F9F; border-radius:6px; padding:12px 14px; margin:12px 0; font-size:9pt; color:#374151; line-height:1.65;"><strong>¿Cómo se calcula?</strong> Cada factor empieza en <strong>100</strong> y pierde puntos por cada incidencia (proveedor que falla una verificación). {esc(calc_example)} Validado: <strong>100</strong> = 0 incidencias (todo ok). Colores: <span style="color:#2E7D32;">■</span> ≥90 verde, <span style="color:#F9A825;">■</span> 70-89 amarillo, <span style="color:#EF6C00;">■</span> 60-69 naranja, <span style="color:#C62828;">■</span> &lt;60 rojo. Fórmula {esc(FORMULA_VERSION)} ({esc(FORMULA_DATE)}).<br>Domain Score {dscore}/100 (higiene técnica) | Overall Score {overall}/100 (benchmark sectorial, ver sección 4 y Anexo F).</div>
-<div class="section-sub" id="sec-historial">7.2 Historial del Score (30 días)</div>
+<div class="section-sub" id="sec-factores">6.1 Factores de Riesgo/Factor Score</div>
+<div style="overflow-x:auto;"><table class="data"><thead><tr><th>Score</th><th>Factor de riesgo</th><th>Incidencias</th><th>Desglose</th><th>Ver sección 10</th></tr></thead><tbody>{frows}</tbody></table></div>
+<div class="info-box" style="font-size:7.5pt;">Conciliación de totales: <strong>{sum(f['incidencias'] for f in factores)} incidencias Factor Score</strong> (suma por factor, con multiplicidad) · <strong>{len(all_findings)} tarjetas distintas</strong> (§10) · <strong>{len(_b7_issues)} observaciones con impacto Overall</strong> (§4). Son tres lecturas del mismo escaneo, no tres escaneos distintos. Un hallazgo con impacto = 1 incidencia; las filas de evidencia de cada hallazgo no suman incidencias. Ausencia (control) y veredicto (conclusión analítica) son IDs distintos sin doble deducción.</div>
+<div style="background:#fff; border:1px solid #D9DEE3; border-left:4px solid #2F6F9F; border-radius:6px; padding:12px 14px; margin:12px 0; font-size:9pt; color:#374151; line-height:1.65;"><strong>¿Cómo se calcula?</strong> Cada factor empieza en <strong>100</strong> y pierde puntos por cada incidencia (proveedor que falla una verificación, compute_factores). {esc(calc_example)} Validado: <strong>100</strong> = 0 incidencias (todo ok). Colores: <span style="color:#2E7D32;">■</span> ≥90 verde, <span style="color:#F9A825;">■</span> 70-89 amarillo, <span style="color:#EF6C00;">■</span> 60-69 naranja, <span style="color:#C62828;">■</span> &lt;60 rojo. Fórmula {esc(FORMULA_VERSION)} ({esc(FORMULA_DATE)}).<br>Puntuación por dominio {dscore}/100 (higiene técnica, sec. 5) | Overall Score {overall}/100 (benchmark B7, sec. 4 y Anexo F).</div>
+<div class="section-sub" id="sec-historial">6.2 Historial del Score (30 días)</div>
 {hist_html}
+<div class="section-sub" id="sec-oasm">6.3 Enriquecimiento (tendencia, ciclo de vida y superficie)</div>
+{_oasm_section_b6(p0, dom0, overall, all_findings, history)}
 </div>
 
-<div class="sec" id="sec-domain"><div class="section-title" style="border-top:3px solid #173B67; padding-top:10px;">8. Domain Score (Tecnico) — vista complementaria</div>
-<div style="display:flex; gap:24px; align-items:center; margin:10px 0; font-size:10pt;">
-<div style="flex:1;"><strong>Domain Score</strong></div>
-<div style="flex:1; text-align:center;">{dscore}/100</div>
-<div style="flex:1; text-align:right;"><strong>Heuristica de</strong> seguridad técnica</div>
-</div>
-<div class="section-sub">Domain Score (Heuristica tecnica)</div>
-<div class="info-box">Parte de <strong>100</strong> y resta.</div>
-<table class="data"><thead><tr><th>Control</th><th>Como se califica</th><th>Referencia</th><th>Estado {esc(dom0)}</th></tr></thead><tbody>
-{ds_rows}
-</tbody></table>
-<div class="info-box" style="font-size:7.5pt;">Tip: Domain {dscore} vs Factor Score {score_general} no es error (metodos distintos). Ver <strong>Anexo F — Nota metodologica de scores</strong>.</div>
-<div style="background:#fff; border:1px solid #D9DEE3; border-left:4px solid #2F6F9F; border-radius:6px; padding:12px 14px; margin:12px 0; font-size:9pt; color:#374151; line-height:1.65;"><strong>¿Cómo se calcula el Domain Score?</strong> Cada control parte de <strong>100</strong> y resta puntos por cada chequeo fallado. {esc(ds_example)} Validado: <strong>100</strong> = sin deducciones (todo ok). Colores: <span style="color:#2E7D32;">■</span> ≥90 verde, <span style="color:#F9A825;">■</span> 70-89 amarillo, <span style="color:#EF6C00;">■</span> 60-69 naranja, <span style="color:#C62828;">■</span> &lt;60 rojo. Fórmula {esc(FORMULA_VERSION)} ({esc(FORMULA_DATE)}).</div>
-</div>
-
-<div class="sec" id="sec-pasivo"><div class="section-title">10. Análisis Pasivo / Activo</div>
-<div class="section-sub">Evidencia de evaluación -- Superficie de Ataque</div>
-<table class="data"><thead><tr><th>Indicador</th><th>Valor</th><th>Interpretacion</th></tr></thead><tbody>{sup_html}</tbody></table>
-<div class="info-box">El análisis combinado pasivo (OSINT, CT logs, DNS, whois) y activo (escaneo de puertos, force bruta de subdominios, pivoteo IP, conexiones TLS) permite obtener una visión completa de la superficie de ataque del proveedor.</div>
+<div class="sec" id="sec-pasivo"><div class="section-title">7. Análisis Pasivo / Activo</div>
+<div class="section-sub">Evidencia de evaluación — Superficie de ataque</div>
+<table class="data"><thead><tr><th>Indicador</th><th>Valor</th><th>Interpretación</th></tr></thead><tbody>{sup_html}</tbody></table>
+<div class="info-box">El análisis combinado pasivo (OSINT, CT logs, DNS, whois) y activo (escaneo de puertos, fuerza bruta de subdominios, pivoteo IP, conexiones TLS) permite obtener una visión completa de la superficie de ataque del proveedor.</div>
 {inventory_html}
 {asset_history_html}
 <div style="background:#fff; border:1px solid #D9DEE3; border-left:4px solid #173B67; border-radius:6px; padding:12px 14px; margin:10px 0;">
 <div style="font-size:10pt; font-weight:700; color:#173B67; margin-bottom:8px;">Configuración DNS - {esc(dom0)}</div>
-<div class="evidence-box">MX: {esc(mx[:120] if mx != "N/A" else "N/A")}<br>NS: {esc(ns[:120] if ns != "N/A" else "N/A")}<br>SPF: {esc((d0.get('spf_record') or 'Ausente')[:120])}<br>DMARC: {esc((d0.get('dmarc_record') or 'Ausente')[:120])}<br>DNSSEC: {'Implementado' if d0.get('dnssec_ok') else 'No implementado'}</div>
+<div class="evidence-box">MX: {esc(mx[:120])}<br>NS: {esc(ns[:120])}<br>SPF: {esc(_spf_txt)}<br>DMARC: {esc(_dmarc_txt)}<br>DNSSEC: {'Implementado' if d0.get('dnssec_ok') else 'No implementado'}</div>
 </div>
 </div>
 
-<div class="sec" id="sec-matriz"><div class="section-title">11. Matriz de Riesgo y Controles</div>
-<div class="info-box"><strong>Cómo leer esta sección:</strong> primero vea el <strong>Estado de Controles</strong> (qué defensas existen), luego la <strong>matriz</strong> (dónde se concentran los riesgos; la esquina roja de arriba a la izquierda se atiende primero), después <strong>10.1</strong> (qué familias pesan más, con número) y <strong>10.2 y 10.3</strong> (evidencia que lo respalda). Todo sale de los hallazgos de la sección 13.<br><strong>Relación con los scores:</strong> esta sección <strong>no mide</strong> ninguno de los tres scores (secciones 3, 7 y 8); se construye directamente de hallazgos y datos crudos. Scores y matriz son dos lecturas distintas de los mismos insumos: un hallazgo puede mover un score sin cambiar la matriz y viceversa. La columna <strong>Mueve a</strong> (10.1) y la fila azul (10.3) indican, por hallazgo y por control, qué scores tienen chequeos en esa área, donde D es Domain, G es General, O es Overall y el guion significa solo contexto.</div>
+<div class="sec" id="sec-matriz"><div class="section-title">8. Matriz de Riesgo y Controles</div>
+<div class="info-box"><strong>Cómo leer esta sección:</strong> primero vea el <strong>Estado de Controles</strong> (qué defensas existen), luego la <strong>matriz</strong> (dónde se concentran los riesgos; la esquina roja de arriba a la izquierda se atiende primero) y <strong>8.1 y 8.2</strong> (evidencia que lo respalda). Todo sale de los hallazgos de la sección 10.<br><strong>Relación con los scores:</strong> esta sección <strong>no mide</strong> ninguno de los tres scores (secciones 3, 5 y 6); se construye directamente de hallazgos y datos crudos. Scores y matriz son dos lecturas distintas de los mismos insumos: un hallazgo puede mover un score sin cambiar la matriz y viceversa. La columna <strong>Mueve a</strong> (tarjetas de la sección 10) y la fila azul (8.2) indican, por hallazgo y por control, qué scores tienen chequeos en esa área, donde D es Domain, G es General, O es Overall y el guion significa solo contexto.</div>
 <div class="section-sub">Estado de Controles</div>
 <table class="data"><thead><tr><th>Control</th><th>Estado</th></tr></thead><tbody>{ctrl_html}</tbody></table>
 <div class="info-box"><strong>{n_ok}</strong> PASS | <strong>{n_par}</strong> PARTIAL | <strong>{n_no}</strong> FAIL<br><span style="font-size:8pt;">PASS = control verificado y activo · PARTIAL = existe pero débil o incompleto · FAIL = no detectado o no conforme.</span></div>
-<div class="info-box" style="font-size:8.5pt; background:#fff; border-left:4px solid #2F6F9F; line-height:1.6;">Detalle por dominio — esta tabla expande el resumen agregado mostrando, para cada control, el resultado por proveedor (<span style="color:#2E7D32; font-weight:700;">&#10004; PASS</span> / <span style="color:#C62828; font-weight:700;">&#10008; FAIL</span>) y el valor exacto observado (cabecera CSP/HSTS, registro SPF/DMARC, versión TLS negociada). Permite trazar cada deducción de sección 7 (Factor Score) y sección 8 (Domain Score) a evidencia sección 12 y priorizar remediación por dominio. Ej.: HSTS FAIL en {esc(dom0)} → -4 en Domain Score y -8 en Overall Network. <span style="color:#6B7280;">Fuente: 11 controles × {len(providers)} proveedor(es) — ver Hallazgos sección 9 para recomendación específica.</span></div>
+<div class="info-box" style="font-size:8.5pt; background:#fff; border-left:4px solid #2F6F9F; line-height:1.6;">Detalle por dominio — esta tabla expande el resumen agregado mostrando, para cada control, el resultado por proveedor (<span style="color:#2E7D32; font-weight:700;">&#10004; PASS</span> / <span style="color:#C62828; font-weight:700;">&#10008; FAIL</span>) y el valor exacto observado (cabecera CSP/HSTS, registro SPF/DMARC, versión TLS negociada). Permite trazar cada control a los hallazgos (sección 10) y scores (secciones 4-6) a la evidencia de la sección 10 y priorizar la remediación por dominio. Ej.: HSTS FAIL en {esc(dom0)} → issue en Cubit Score con impacto decimal (ver sección 4). <span style="color:#6B7280;">Fuente: 11 controles × {len(providers)} {"proveedor" if len(providers) == 1 else "proveedores"} — ver Hallazgos en la sección 10 para la recomendación específica.</span></div>
 {controls_html}
 {render_risk_matrix(all_findings)}
-<div class="section-sub" id="sec-agregados">11.1 Hallazgos Agregados</div>
-<table class="data"><thead><tr><th>Tipo</th><th>Descripción</th><th>Proveedores</th><th>Impacto</th><th>Mueve a</th></tr></thead><tbody>{agg_html or "<tr><td colspan='5'>Sin hallazgos agregados</td></tr>"}</tbody></table>
-{agg_example}{agg_note if all_findings else ""}
-<div class="info-box" style="font-size:7pt; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:6px; padding:8px 10px; margin:8px 0;">D = Domain (Domain Score, higiene técnica) · G = General (Factor Score, 10 factores) · O = Overall (Puntuación Global, benchmark ponderado). Ej.: "G · O" mueve Factor Score y Overall; "D · G · O" mueve los tres. Ver trazabilidad detallada en sección 4.</div>
+<div class="info-box" style="font-size:7pt; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:6px; padding:8px 10px; margin:8px 0;">D = Domain (higiene técnica: domain_score, sec. 5) · G = General (Factor Score heurístico: compute_factores, 10 factores, sec. 6) · O = Overall (benchmark B7, sec. 4). Ej.: "G · O" mueve Factor Score y Overall; "D · G · O" mueve los tres. Ver trazabilidad detallada en la sección 4.1 y Anexo F.</div>
 <div class="info-box" style="font-size:7pt; background:#fff; border:1px solid #E5E7EB; border-left:4px solid #2F6F9F; border-radius:6px; padding:8px 10px; margin:8px 0;">Severidad ≠ Prioridad ≠ Confianza: Severidad = impacto técnico si se explota; Prioridad/SLA (P1 0-7d, P2 8-30d, P3 31-60d, P4 continuo) = urgencia de remediación; Confianza = certeza de la evidencia (HIGH/MEDIUM/LOW — ej. DNSBL shared sin corroboración = LOW, CSP enforced observado = MEDIUM/HIGH). Un hallazgo puede ser MEDIA/P2/LOW (ej. terceros DNSBL) o MEDIA/P2/MEDIUM (ej. CSP base-uri enforced).</div>
-<div class="section-sub" id="sec-osint">11.2 OSINT Pasivo -- CT, SAN, CAA, MTA-STS, TLS-RPT, BIMI</div>
+<div class="section-sub" id="sec-osint">8.1 OSINT Pasivo — CT, SAN, CAA, MTA-STS, TLS-RPT, BIMI</div>
 <table class="data"><thead><tr><th>Dominio</th><th>CT</th><th>SAN</th><th>CAA</th><th>MTA-STS</th></tr></thead><tbody>{osint_rows}</tbody></table>
 <div style="font-size:7.5pt; color:#6B7280;">CT = subdominios en logs publicos de certificados · SAN = nombres alternos del certificado · CAA/MTA-STS = controles presentes (&#10003;) o ausentes (&#10008;).</div>
 <div class="info-box">Resumen consolidado por categoría. Datos OSINT públicos sin tráfico directo.</div>
 {matrix_asm_html}
 </div>
 
-<div class="sec" id="sec-enriquecimiento"><div class="section-title">12. Enriquecimiento y Superficie Detallada</div>
+<div class="sec" id="sec-enriquecimiento"><div class="section-title">9. Enriquecimiento y Superficie Detallada</div>
 <div class="info-box">Ficha por proveedor con el detalle del informe GC: tarjeta (score/KPI/HTTPS-TLS), listas de subdominios/CRT/SAN, vulnerabilidades, patching, supply-chain, banners, API, rutas, TLS, puertos, takeover, CSP/cookies, reputación, WAF/cloud, OSINT externo, KUMO, Prism, Claude-OSINT, Strix, FinalRecon, OWASP, social, WHO-DAT y registros CT/DNS. Solo se muestran bloques con datos reales del escaneo.</div>
 {gc_sections}
 </div>
 
-<div class="sec" id="sec-hallazgos"><div class="section-title">13. Detalle de Hallazgos (evidencia forense extendida)</div>
-<div class="info-box">Cada hallazgo incluye: explicacion del riesgo, recomendación de mitigación y evidencia técnica del escaneo.</div>
+<div class="sec" id="sec-hallazgos"><div class="section-title">10. Detalle de Hallazgos (evidencia forense extendida)</div>
+<div class="info-box">Cada hallazgo incluye: explicación del riesgo, recomendación de mitigación y evidencia técnica del escaneo. Son {len(all_findings)} tarjetas en total; las marcadas con “Impacto scores: —” son contexto informativo y no restan puntos. El Overall se calcula con {len(_b7_issues)} incidencias con impacto (modelo B7, sección 4.1). <strong>Threat Level (SSC)</strong> = clasificación oficial SecurityScorecard ed. 021026 por tipo de issue (HIGH/MEDIUM/LOW/INFO), independiente de nuestra severidad (Severidad interna = impacto si se explota); “—” = sin equivalente directo en la tabla SSC.</div>
 {cards or "<div class='info-box'>Sin hallazgos con los datos actuales.</div>"}
 </div>
 {render_traceability_table(all_findings, providers, p0, locals().get('_ov_scores') or {}, overall, dscore, score_general)}
-<div class="sec" id="sec-recomendaciones"><div class="section-title">14. Recomendaciones Priorizadas</div>
-<div class="section-sub2">P1 - Inmediato (0-7 días)</div>{rec_list('P1')}
-<div class="section-sub2">P2 - Corto plazo (8-30 días)</div>{rec_list('P2')}
-<div class="section-sub2">P3 - Mediano plazo (31-60 días)</div>{rec_list('P3')}
-<div class="section-sub2">P4 - Mejora continua</div>{rec_list('P4')}
-<div class="section-sub">Gantt RACI -- Plan de remediación (con coste/esfuerzo)</div>
-<table class="data"><thead><tr><th>Actividad</th><th>Plazo</th><th>Esfuerzo (h)</th><th>Coste est. (€)</th><th>R</th><th>A</th><th>C</th></tr></thead><tbody>
-<tr><td>Activar HSTS / preload</td><td>0-7 días</td><td class='num'>4</td><td class='num'>-</td><td>Infra</td><td>AppSec</td><td>Correo</td></tr>
-<tr><td>CSP: eliminar unsafe-inline, nonces/hashes</td><td>0-7 días</td><td class='num'>8</td><td class='num'>-</td><td>AppSec</td><td>Infra</td><td>Dev</td></tr>
-<tr><td>SPF: ~all hacia -all; DKIM rotar claves</td><td>8-30 días</td><td class='num'>16</td><td class='num'>-</td><td>Correo</td><td>Infra</td><td>Legal</td></tr>
-<tr><td>DMARC: p=none hacia quarantine hacia reject</td><td>8-30 días</td><td class='num'>12</td><td class='num'>-</td><td>Correo</td><td>Legal</td><td>Infra</td></tr>
-<tr><td>DNSSEC + CAA + MTA-STS + TLS-RPT</td><td>8-30 días</td><td class='num'>24</td><td class='num'>-</td><td>Infra</td><td>AppSec</td><td>--</td></tr>
-<tr><td>Parchear subs / staging-prod cleanup</td><td>31-60 días</td><td class='num'>40</td><td class='num'>-</td><td>Infra</td><td>AppSec</td><td>Dev</td></tr>
-<tr><td>Typosquatting: registro defensivo / UDRP</td><td>31-60 días</td><td class='num'>8</td><td class='num'>-</td><td>Legal</td><td>AppSec</td><td>Infra</td></tr>
-<tr><td>SANs: consolidar certificados</td><td>P4</td><td class='num'>16</td><td class='num'>-</td><td>Infra</td><td>AppSec</td><td>--</td></tr>
-<tr><td>Programa bug bounty / VDP</td><td>P4</td><td class='num'>40</td><td class='num'>-</td><td>AppSec</td><td>Legal</td><td>Infra</td></tr>
-<tr><td>Monitoreo continuo ASM + alertas</td><td>P4</td><td class='num'>24</td><td class='num'>-</td><td>Infra</td><td>AppSec</td><td>--</td></tr>
-</tbody></table>
-<div class="info-box">R=Responsable, A=Aprobador, C=Consultado. Plazos: 0-7/P1, 8-30/P2, 31-60/P3, P4=Mejora continua. Tarifa media 75€/h.</div>
-</div>
-
-<div class="sec" id="sec-fuentes"><div class="section-title">15. Fuentes y Referencias</div>
+<div class="sec" id="sec-fuentes"><div class="section-title">11. Fuentes y Referencias</div>
 {render_factores_evaluados(providers)}
 <div class="info-box"><strong>Estandares:</strong> RFC 6797 (HSTS), RFC 7489 (DMARC), RFC 7208 (SPF). NIST CSF / ISO 27001 / PCI DSS / DORA según mapeo por hallazgo.</div>
 </div>
 
-<div class="sec" id="sec-glosario"><div class="section-title">16. Glosario</div>
-<table class="data"><thead><tr><th>Termino</th><th>Significado</th></tr></thead><tbody>
-<tr><td><strong>SPF</strong></td><td>Registro DNS que declara que servidores pueden enviar correo del dominio (RFC 7208).</td></tr>
-<tr><td><strong>DKIM</strong></td><td>Firma criptografica que garantiza que el correo no fue alterado.</td></tr>
-<tr><td><strong>DMARC</strong></td><td>Política que une SPF/DKIM y ordena que hacer con lo no autenticado (none/quarantine/reject, RFC 7489).</td></tr>
-<tr><td><strong>DNSSEC</strong></td><td>Firma de respuestas DNS contra suplantacion de registros.</td></tr>
-<tr><td><strong>CAA</strong></td><td>Registro que limita que autoridades (CA) pueden emitir certificados del dominio.</td></tr>
-<tr><td><strong>MTA-STS</strong></td><td>Política que exige TLS cifrado en la entrega de correo entre servidores.</td></tr>
-<tr><td><strong>TLS-RPT</strong></td><td>Reportes de fallos de cifrado TLS entre servidores de correo.</td></tr>
-<tr><td><strong>BIMI</strong></td><td>Muestra el logo de la marca junto a correos autenticados.</td></tr>
-<tr><td><strong>DANE/TLSA</strong></td><td>Asocia certificados TLS especificos via DNS (requiere DNSSEC).</td></tr>
-<tr><td><strong>STARTTLS</strong></td><td>Negociacion de cifrado TLS en conexiones de correo.</td></tr>
-<tr><td><strong>HSTS</strong></td><td>Cabecera que obliga al navegador a usar solo HTTPS (RFC 6797).</td></tr>
-<tr><td><strong>CSP</strong></td><td>Política que restringe de donde puede cargar scripts/recursos el navegador (anti-XSS).</td></tr>
-<tr><td><strong>Subdomain takeover</strong></td><td>Apropiacion de un subdominio cuyo destino externo (CNAME) quedo liberado.</td></tr>
-<tr><td><strong>Typosquatting</strong></td><td>Dominios con errores tipograficos registrados para phishing.</td></tr>
-<tr><td><strong>EPSS</strong></td><td>Probabilidad estimada (0-1) de que un CVE sea explotado en 30 días (FIRST).</td></tr>
-<tr><td><strong>KEV</strong></td><td>Catalogo CISA de vulnerabilidades con explotación activa confirmada.</td></tr>
-<tr><td><strong>WAF</strong></td><td>Firewall de aplicaciones web que filtra tráfico malicioso antes del origen.</td></tr>
-<tr><td><strong>OSINT</strong></td><td>Inteligencia con fuentes abiertas y públicas, sin interactuar con el objetivo.</td></tr>
-<tr><td><strong>CT logs</strong></td><td>Registros publicos de transparencia de certificados (fuente de subdominios).</td></tr>
-</tbody></table>
+<div class="sec" id="sec-anexos"><div class="section-title">12. Anexos</div>
+<div class="section-sub" id="sec-anexo-e">Anexo E — Notas metodológicas</div>
+<div class="info-box">Historial 30 días: {len(hist)} punto(s) reales de <code>scan_history.db</code> (se requieren 2+ escaneos; sin historial se muestra aviso, nunca simulación). Dominio {dscore} (higiene B5/B6): promedio de domain_score por proveedor. Overall {overall}: motor B7 (base precia + impactos decimales). Las fichas por proveedor adoptan los bloques de detalle del informe GC (generate_cibest_report.py). Mapeo de cumplimiento NIST/PCI/DORA por hallazgo. Datos 100% reales desde asm_report.json.</div>
+    <div class="section-sub" id="sec-anexo-f" style="page-break-before:always;">Anexo F — Nota metodológica de scores</div>
+<div class="info-box" style="line-height:1.7; font-size:8.5pt;">El presente informe utiliza tres métricas complementarias. Cada una tiene un propósito y una metodología diferente; por esta razón, sus valores no deben interpretarse como equivalentes.<br><br>
+<strong>1. OVERALL SCORE — {overall}/100</strong><br>
+<em>Propósito:</em> métrica agregada para comparación sectorial (benchmark).<br>
+<em>Metodología:</em> motor B7: base precia por factor + impactos decimales de los hallazgos, promedio simple de 10 factores sin pesos (SSC v3.0). Desglose reproducible en la sección 4.1.<br>
+No corresponde a una calificación oficial de SecurityScorecard ni debe interpretarse como tal. Se utiliza únicamente como métrica interna de benchmarking.<br><br>
+<strong>2. PUNTUACIÓN POR DOMINIO — {dscore}/100</strong><br>
+<em>Propósito:</em> higiene técnica del dominio evaluado (sección 5).<br>
+<em>Metodología:</em> heurística B5/B6: cada control parte de 100 y resta puntos por chequeo fallado (domain_score); el valor mostrado promedia los proveedores.<br>
+<em>Ejemplo del presente análisis:</em> {esc(ds_example)}<br>
+<em>Nota:</em> Este indicador representa exclusivamente la evaluación técnica del dominio y no constituye una calificación global de la organización.<br><br>
+<strong>3. FACTOR SCORE — {score_general}/100</strong><br>
+<em>Propósito:</em> consolidación simple de los 10 factores de riesgo (sección 6).<br>
+<em>Metodología:</em> heurística B5/B6: cada factor empieza en 100 y pierde puntos por incidencia (compute_factores); promedio simple.<br>
+<em>Ejemplo del presente análisis:</em> {esc(calc_example)}<br>
+Los factores se calculan de forma independiente y posteriormente se consolidan en el resultado general.<br><br>
+<strong>4. TRAZABILIDAD</strong><br>
+Cada deducción debe poder relacionarse con: Hallazgo → Regla → Evidencia → Factor → Deducción → Score resultante. Los valores mostrados corresponden a la captura de evaluación indicada en la portada. La trazabilidad heurística audita el Factor Score; el Overall se audita en la sección 4.1. Ver la sección 10 y la trazabilidad detallada.<br><br>
+<strong>5. INTERPRETACIÓN</strong><br>
+Overall = benchmark B7 · Dominio = higiene técnica · Factor = consolidación de factores<br>
+Los tres indicadores deben analizarse conjuntamente con los hallazgos y evidencias detalladas del informe.<br><br>
+<strong>TABLA DE MÉTRICAS</strong><br>Overall — promedio simple de 10 factores B7 (base precia + impactos decimales) — fuente: b7_provider_scores — uso: benchmark sectorial.<br>Puntuación por dominio — promedio de domain_score (higiene: 100 − deducciones por control) — fuente: domain_deductions — uso: vista por proveedor.<br>Factor Score — promedio simple de 10 factores heurísticos — fuente: compute_factores/b3_deductions — uso: tablero por factor.<br>Histórico score_general/domain_score en BD — heurística B5/B6 al momento del escaneo — uso: tendencia (misma familia; ver nota de motores en la sección 6.2).<br><br><strong>6. ALINEACIÓN CON SECURITYSCORECARD v3.0 (ED. 021026)</strong><br>
+<em>Referencia:</em> “A Deep Dive in Scoring Methodology” v3.0, edición 021026 (©2026 SecurityScorecard Inc.). Este informe adopta su marco: 10 grupos de factores, calificaciones A (90–100) a F (&lt;60), issues con peso por severidad según correlación con probabilidad de brecha, y principio de que los issues informativos/positivos no restan puntos. La validación estadística de SSC muestra que una calificación F tiene 13.8x mayor probabilidad de brecha que una A.<br>
+<em>Flujo aplicado:</em> recolección de señales (DNS/CT/logs/OSINT) → atribución (pivoteo IP↔dominio) → ciberanalítica (motores KUMO/Prism/Claude-OSINT) → motor de scoring (precia/B7).<br>
+<em>Recalibración de la edición:</em> SSC ajusta severidades por recalibración trimestral; respecto a la edición anterior cambian 4 tipos: CSP con directiva ‘unsafe’ (Threat INFO→LOW), credenciales en riesgo 120 días (Threat INFO→LOW), SO desactualizado y navegador desactualizado (Breach/Threat HIGH→MEDIUM). El motor B6-v3.1 ya opera sin pesos por factor, conforme a v3.0.<br><br>
+<strong>7. ADOPCIÓN v3.0 Y LIMITACIONES</strong><br>
+<em>Pesos por factor:</em> la metodología v3.0 calcula el Total desde pesos por tipo de hallazgo, sin pesos por factor; B6-v3.1 la adopta (promedio simple de los 10 factores). Este Overall sigue siendo benchmark interno, no calificación oficial.<br>
+<em>Limitaciones (outside-in):</em> evaluación externa no intrusiva; no se detectan controles compensatorios internos (el score puede leer por debajo del real); la atribución IP↔dominio es probabilística (~95% de precisión reportada por SSC); la internet es dinámica (IPs/puertos se reasignan). Sin penalización por brecha aplicada en este corte.<br>
+</div>
 </div>
 
-<div class="sec" id="sec-anexos"><div class="section-title">17. Anexos</div>
-<div class="section-sub" id="sec-anexo-a">Anexo A -- SANs completos ({len(san_all)} total)</div>
-<table class="data"><thead><tr><th>Dominio</th><th>Subject Alternative Names</th></tr></thead><tbody>{san_rows}</tbody></table>
-<div class="section-sub" id="sec-anexo-b">Anexo B -- CT Logs: {esc(dom0)} ({len(subs_all)} subdominios)</div>
-<div class="evidence-box">{ct_html[:1500]}</div>
-<div class="section-sub" id="sec-anexo-c">Anexo C -- Headers HTTP crudos: {esc(dom0)}</div>
-<div class="evidence-box">{raw_hdrs}</div>
-<div class="section-sub" id="sec-anexo-d">Anexo D -- Shodan InternetDB + Exposure: {esc(dom0)}</div>
-<div class="evidence-box">{anexo_e}</div>
-<div class="section-sub" id="sec-anexo-e">Anexo E -- Notas metodologicas</div>
-<div class="info-box">Historial 30 días: {len(hist)} punto(s) reales de <code>scan_history.db</code> (se requieren 2+ escaneos; sin historial se muestra aviso, nunca simulacion). Domain Score {dscore}: heuristica benevola 100 menos deducciones. Overall {overall}: promedio de factores. Sección 8 adopta los bloques de detalle del informe GC (generate_cibest_report.py). Compliance mapping NIST/PCI/DORA por hallazgo. Datos 100% reales desde asm_report.json.</div>
-    <div class="section-sub" id="sec-anexo-f" style="page-break-before:always;">Anexo F -- Nota metodologica de scores</div>
-<div class="info-box" style="line-height:1.7; font-size:8.5pt;">El presente informe utiliza tres métricas complementarias. Cada una tiene un propósito y una metodología diferente; por esta razón, sus valores no deben interpretarse como equivalentes.<br><br>
-<strong>1. DOMAIN SCORE — {dscore}/100</strong><br>
-<em>Propósito:</em> medir la higiene técnica observable del dominio evaluado.<br>
-<em>Metodología:</em> Se parte de 100 puntos y se aplican deducciones asociadas a controles técnicos verificables durante el escaneo.<br>
-<em>Ejemplo del presente análisis:</em> {", ".join(f"{lbl} {pts}" for lbl, pts in _ded[:7]) if _ded else "sin deducciones"} → {dscore}/100<br>
-<em>Nota:</em> Este indicador representa exclusivamente la evaluación técnica del dominio y no constituye una calificación global de la organización.<br><br>
-<strong>2. FACTOR SCORE — {score_general}/100</strong><br>
-<em>Propósito:</em> consolidar factores de riesgo utilizados por el modelo B6.<br>
-Cada factor parte de 100 y recibe deducciones según las incidencias identificadas y las reglas correspondientes (10 factores, promedio simple).<br>
-Los factores se calculan de forma independiente y posteriormente se consolidan en el resultado general.<br><br>
-<strong>3. OVERALL SCORE — {overall}/100</strong><br>
-<em>Propósito:</em> proporcionar una métrica agregada para comparación sectorial.<br>
-El Overall Score utiliza el modelo de factores definido por el motor B6 y sus respectivos pesos (Network/DNS/Patching/IPRep/AppSec ×1.2, resto ×1.0/0.9/0.8, ΣPesos=10.5).<br>
-No corresponde a una calificación oficial de SecurityScorecard ni debe interpretarse como tal. Se utiliza únicamente como métrica interna de benchmarking.<br><br>
-<strong>4. TRAZABILIDAD</strong><br>
-Cada deducción debe poder relacionarse con: Hallazgo → Regla → Evidencia → Factor → Deducción → Score resultante. Los valores mostrados corresponden al snapshot de evaluación indicado en la portada. Ver sección 12 y trazabilidad detallada.<br><br>
-<strong>5. INTERPRETACIÓN</strong><br>
-Domain Score = higiene técnica<br>
-Factor Score = consolidación de factores de riesgo<br>
-Overall Score = métrica agregada para benchmarking<br>
-Los tres indicadores deben analizarse conjuntamente con los hallazgos y evidencias detalladas del informe.
-</div>
-<div class="legal-note">Este documento corresponde a una evaluación puntual basada en la información disponible al momento de generacion. Los resultados deben ser validados antes de tomar decisiones operativas o contractuales.<br>INFORME UNIFICADO B6 - {esc(dom0)} | Preparado: {esc(fecha)}</div>
+<div class="sec" id="sec-legal" style="page-break-before:always;"><div class="section-title">13. Nota legal</div>
+<div class="info-box" style="line-height:1.7; font-size:8.5pt;">Los análisis, calificaciones y declaraciones de este documento son opiniones sobre riesgos futuros relativos de seguridad a la fecha indicada; no constituyen hechos históricos, recomendaciones de negocio ni avales de exactitud. Fórmula {esc(FORMULA_VERSION)}: 10 factores 0-100 con impacto decimal por hallazgo; sin datos observados el módulo se reporta limpio; solo se usa lo medido en el escaneo.<br><br>
+Las calificaciones no sustituyen el juicio del usuario; cada una pondera como un factor más en sus decisiones. Tras remediar, vuelva a medir para actualizar el Score.</div>
+<div class="legal-note">Este documento corresponde a una evaluación puntual basada en la información disponible al momento de generación. Los resultados deben ser validados antes de tomar decisiones operativas o contractuales.<br>INFORME UNIFICADO B6 - {esc(dom0)} | Preparado: {esc(fecha)} | (c) 2026 GrupoCibest. Derechos reservados.</div>
 </div>
 
 </div></body></html>"""

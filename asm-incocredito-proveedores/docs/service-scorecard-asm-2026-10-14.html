@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASM Informe Proveedores Scorecard</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --border: #dfe3e8;
+  --border-strong: #c6ccd4;
+  --text: #14181d;
+  --text-dim: #5b6572;
+  --text-faint: #8792a0;
+  --accent: #2f6fed;
+  --g-a: #1f9d55;
+  --g-b: #4a9f2f;
+  --g-c: #c08a12;
+  --g-d: #d97116;
+  --g-e: #d94f2b;
+  --g-f: #c62828;
+  --g-na: #8792a0;
+  --shadow: 0 1px 2px rgba(20, 24, 29, .06), 0 8px 24px rgba(20, 24, 29, .05);
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116;
+    --surface: #161b22;
+    --surface-2: #1c2230;
+    --border: #2a313c;
+    --border-strong: #3b4553;
+    --text: #e8ecf1;
+    --text-dim: #9aa5b4;
+    --text-faint: #6e7b8c;
+    --accent: #6d9bff;
+    --g-a: #46c07d;
+    --g-b: #7fc94f;
+    --g-c: #e0b13c;
+    --g-d: #f0954a;
+    --g-e: #f2705a;
+    --g-f: #f0554f;
+    --g-na: #6e7b8c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --surface: #161b22;
+  --surface-2: #1c2230;
+  --border: #2a313c;
+  --border-strong: #3b4553;
+  --text: #e8ecf1;
+  --text-dim: #9aa5b4;
+  --text-faint: #6e7b8c;
+  --accent: #6d9bff;
+  --g-a: #46c07d;
+  --g-b: #7fc94f;
+  --g-c: #e0b13c;
+  --g-d: #f0954a;
+  --g-e: #f2705a;
+  --g-f: #f0554f;
+  --g-na: #6e7b8c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.page { max-width: 960px; margin: 0 auto; padding: 40px 20px 80px; }
+
+.masthead { margin-bottom: 28px; }
+.eyebrow {
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--text-faint); font-weight: 600; margin: 0 0 6px;
+}
+h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 0 0 12px; letter-spacing: -.02em; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 13px; color: var(--text-dim); }
+.meta span { white-space: nowrap; }
+.meta code { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.overall { display: flex; flex-wrap: wrap; align-items: center; gap: 28px; padding: 28px; margin-bottom: 32px; }
+.overall-badge {
+  flex: 0 0 auto; width: 116px; height: 116px; border-radius: 16px;
+  display: grid; place-items: center; line-height: 1;
+  background: var(--surface-2); border: 2px solid currentColor;
+}
+.overall-badge .letter { font-size: 60px; font-weight: 700; letter-spacing: -.04em; }
+.overall-body { flex: 1 1 320px; min-width: 260px; }
+.overall-body h2 { margin: 0 0 8px; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
+.overall-body p { margin: 0 0 12px; font-size: 16px; }
+.gpa { font-family: var(--mono); font-size: 13px; color: var(--text-dim); }
+.gpa strong { color: var(--text); }
+
+h2.section { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; margin: 0 0 14px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 40px; }
+.chip {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 9px;
+  text-decoration: none; color: inherit;
+}
+.chip:hover { border-color: var(--border-strong); }
+.chip .letter {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px;
+  display: grid; place-items: center; font-weight: 700; font-size: 15px;
+  background: var(--surface-2); border: 1.5px solid currentColor;
+}
+.chip .label { font-size: 13px; line-height: 1.3; color: var(--text); }
+.chip .w { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-faint); }
+
+.facet { padding: 24px; margin-bottom: 16px; scroll-margin-top: 20px; }
+.facet-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+.facet-head .letter {
+  flex: 0 0 auto; width: 46px; height: 46px; border-radius: 10px;
+  display: grid; place-items: center; font-weight: 700; font-size: 24px;
+  background: var(--surface-2); border: 2px solid currentColor;
+}
+.facet-head h3 { margin: 4px 0 2px; font-size: 19px; letter-spacing: -.01em; }
+.facet-head .sub { font-size: 12px; color: var(--text-faint); font-family: var(--mono); }
+
+.scale { display: flex; gap: 3px; margin: 0 0 16px; }
+.scale span {
+  flex: 1; height: 5px; border-radius: 3px; background: var(--border);
+}
+.scale span.on { background: currentColor; }
+
+.assessment { margin: 0 0 16px; }
+.assessment p { margin: 0 0 10px; }
+.assessment p:last-child { margin-bottom: 0; }
+
+.evidence { margin: 0 0 18px; }
+.evidence h4, .paths h4 {
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-faint); font-weight: 600; margin: 0 0 8px;
+}
+.evidence ul { margin: 0; padding-left: 18px; }
+.evidence li { font-family: var(--mono); font-size: 12.5px; color: var(--text-dim); margin-bottom: 4px; }
+.evidence li .note { font-family: var(--sans); font-size: 13px; color: var(--text-dim); }
+
+.paths { border-top: 1px solid var(--border); padding-top: 16px; }
+.paths ol { margin: 0; padding-left: 20px; }
+.paths li { margin-bottom: 10px; }
+.paths li:last-child { margin-bottom: 0; }
+.paths li strong { font-weight: 600; }
+.paths code, .assessment code, .overall-body code {
+  font-family: var(--mono); font-size: 12.5px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 5px;
+}
+
+.g-a { color: var(--g-a); }
+.g-b { color: var(--g-b); }
+.g-c { color: var(--g-c); }
+.g-d { color: var(--g-d); }
+.g-e { color: var(--g-e); }
+.g-f { color: var(--g-f); }
+.g-na { color: var(--g-na); }
+.g-na .letter { font-size: 12px !important; letter-spacing: .04em; }
+
+.method { padding: 24px; margin-top: 40px; }
+.method h2 { margin-top: 0; }
+.method p { color: var(--text-dim); font-size: 14px; }
+.method table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 14px 0; }
+.method th, .method td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.method th { color: var(--text-faint); font-weight: 600; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.method td:first-child { font-family: var(--mono); }
+.table-wrap { overflow-x: auto; }
+
+footer { margin-top: 32px; font-size: 12px; color: var(--text-faint); text-align: center; }
+
+@media print {
+  body { background: #fff; }
+  .page { max-width: none; padding: 0; }
+  .card { box-shadow: none; break-inside: avoid; }
+  .facet { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Service scorecard</p>
+    <h1>ASM Informe Proveedores</h1>
+    <div class="meta">
+      <span><code>asm-incocredito-proveedores</code></span>
+      <span>commit <code>e0be117b</code></span>
+      <span>Python 3.11 · FastAPI · Playwright</span>
+      <span>165 files · ~39k lines</span>
+      <span>2026-10-14</span>
+    </div>
+  </header>
+
+  <section class="card overall g-c">
+    <div class="overall-badge"><span class="letter">C</span></div>
+    <div class="overall-body">
+      <h2>Overall grade</h2>
+      <p>Mantenible por quien lo conoce, costoso de heredar: scoring duplicado, sin auth y secretos en el repo lastran; la higiene reciente (canon, tests, retiros) va en la dirección correcta.</p>
+      <p class="gpa">Weighted GPA <strong>3.00</strong> / 5.00 &nbsp;·&nbsp; Σ(weight × points) 132 ÷ Σ(weight) 44</p>
+    </div>
+  </section>
+
+  <h2 class="section">All facets</h2>
+  <div class="grid">
+    <a class="chip g-d" href="#logic-duplication">
+      <span class="letter">D</span>
+      <span class="label">Logic duplication</span>
+      <span class="w">×3</span>
+    </a>
+<a class="chip g-d" href="#api-security">
+      <span class="letter">D</span>
+      <span class="label">API security</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-d" href="#config-secrets">
+      <span class="letter">D</span>
+      <span class="label">Config & secrets</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-d" href="#api-versioning">
+      <span class="letter">D</span>
+      <span class="label">API versioning</span>
+      <span class="w">×1</span>
+    </a>
+<a class="chip g-c" href="#layering-depth">
+      <span class="letter">C</span>
+      <span class="label">Layering depth</span>
+      <span class="w">×3</span>
+    </a>
+<a class="chip g-c" href="#domain-boundary-clarity">
+      <span class="letter">C</span>
+      <span class="label">Domain boundary clarity</span>
+      <span class="w">×3</span>
+    </a>
+<a class="chip g-c" href="#naming-consistency">
+      <span class="letter">C</span>
+      <span class="label">Naming consistency</span>
+      <span class="w">×3</span>
+    </a>
+<a class="chip g-c" href="#maintenance-effort">
+      <span class="letter">C</span>
+      <span class="label">Maintenance effort</span>
+      <span class="w">×3</span>
+    </a>
+<a class="chip g-c" href="#dead-code">
+      <span class="letter">C</span>
+      <span class="label">Dead code</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-c" href="#api-completeness">
+      <span class="letter">C</span>
+      <span class="label">API completeness</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-c" href="#storage-simplicity">
+      <span class="letter">C</span>
+      <span class="label">Storage simplicity</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-c" href="#dependency-health">
+      <span class="letter">C</span>
+      <span class="label">Dependency health</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-c" href="#test-coverage-quality">
+      <span class="letter">C</span>
+      <span class="label">Test coverage & quality</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-c" href="#local-dev-experience">
+      <span class="letter">C</span>
+      <span class="label">Local dev experience</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-c" href="#data-model-migrations">
+      <span class="letter">C</span>
+      <span class="label">Data model & migrations</span>
+      <span class="w">×1</span>
+    </a>
+<a class="chip g-c" href="#deployment-complexity">
+      <span class="letter">C</span>
+      <span class="label">Deployment complexity</span>
+      <span class="w">×1</span>
+    </a>
+<a class="chip g-c" href="#observability">
+      <span class="letter">C</span>
+      <span class="label">Observability</span>
+      <span class="w">×1</span>
+    </a>
+<a class="chip g-c" href="#error-handling">
+      <span class="letter">C</span>
+      <span class="label">Error handling</span>
+      <span class="w">×1</span>
+    </a>
+<a class="chip g-b" href="#repo-navigability">
+      <span class="letter">B</span>
+      <span class="label">Repo navigability</span>
+      <span class="w">×3</span>
+    </a>
+<a class="chip g-b" href="#documentation-rot">
+      <span class="letter">B</span>
+      <span class="label">Documentation rot</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-b" href="#service-coupling">
+      <span class="letter">B</span>
+      <span class="label">Service coupling</span>
+      <span class="w">×2</span>
+    </a>
+<a class="chip g-b" href="#performance-shape">
+      <span class="letter">B</span>
+      <span class="label">Performance shape</span>
+      <span class="w">×1</span>
+    </a>
+<a class="chip g-na" href="#event-contract-quality">
+      <span class="letter">N/A</span>
+      <span class="label">Event contract quality</span>
+      <span class="w">×2</span>
+    </a>
+  </div>
+
+  <h2 class="section">Findings — worst first</h2>
+
+  <section class="card facet g-d" id="logic-duplication">
+    <div class="facet-head">
+      <span class="letter">D</span>
+      <div>
+        <h3>Logic duplication</h3>
+        <p class="sub">weight ×3 · La misma regla vive en varios generadores</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class=""></span>
+      <span class="on"></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Los 8 motores de scoring y detalle (domain_score, compute_factores, b3_deductions, domain_deductions, gc_provider_detail, render_matrix_asm, prev_scan_scores, paginate_toc) están definidos casi idénticos en <code>generate_b3/b4/b5/b6_unified_report.py</code>, y los bloques OWASP/Strix/Prism se copiaron a 9 generadores. Las copias ya divergen: B6 puntúa con motor B7 mientras B3-B5 usan heurística propia, así que un fix en una no corrige las otras.</p><p>Hay consolidación real en marcha (pasivo_canon, semi_canon, severity, owasp_web, helper b7_provider_scores), por eso no es F: la dirección es centralizar, pero el grueso duplicado sigue ahí.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>generate_b3_unified_report.py:689 <span class="note">— domain_score propio</span></li><li>generate_b6_unified_report.py:946 <span class="note">— domain_score propio</span></li><li>generate_b3_unified_report.py:864 <span class="note">— compute_factores propio</span></li><li>generate_b6_unified_report.py:1119 <span class="note">— compute_factores propio</span></li><li>owasp_web.py:1 <span class="note">— mapeo Web centralizado nuevo</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Extraer scoring a un módulo score_engine con funciones puras</strong></li><li><strong>Hacer que B3-B6 importen domain_score/compute_factores/desglose de ese</strong></li><li><strong>Convertir bloques OWASP/Strix/Prism en funciones render compartidas po</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-d" id="api-security">
+    <div class="facet-head">
+      <span class="letter">D</span>
+      <div>
+        <h3>API security</h3>
+        <p class="sub">weight ×2 · Sin autenticación; clave privada en el repo</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class=""></span>
+      <span class="on"></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Cero controles de authn/authz en el dashboard (verificado por grep: ninguna coincidencia): quien alcanza el puerto puede escanear y descargar. Mitigaciones reales: solo LAN + TLS. Agravante: <code>cert.pem/key.pem</code> junto al código (nunca en git; rotado 2026-10-14).</p><p>Funciona por aislamiento de red, no por diseño.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>dashboard_server.py:625 <span class="note">— sin middleware de auth</span></li><li>cert.pem:1 <span class="note">— certificado junto al código (rotado 2026-10-14)</span></li><li>key.pem:1 <span class="note">— clave privada junto al código (rotada 2026-10-14)</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Añadir token bearer para /api/scan* o ligar a loopback por defecto</strong></li><li><strong>Sacar key.pem del repo y cargarla desde ruta fuera de git</strong></li><li><strong>Documentar el modelo de amenaza LAN en SECURITY.md</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-d" id="config-secrets">
+    <div class="facet-head">
+      <span class="letter">D</span>
+      <div>
+        <h3>Config & secrets</h3>
+        <p class="sub">weight ×2 · Claves en repo y env disperso</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class=""></span>
+      <span class="on"></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p><code>key.pem</code> (privada junto al código, rotada 2026-10-14); <code>None/.config/finalrecon/keys.json</code> abandonado con posible secreto; 23 lecturas de entorno repartidas (<code>STRIX_LLM/LLM_API_KEY</code>, <code>ASM_DASHBOARD_*</code>) sin ejemplo central. <code>integrations_config.json</code> existe pero no cubre todo.</p><p>Nada indica exfiltración, pero el inventario de secretos no existe.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>key.pem:1 <span class="note">— privada junto al código (nunca en git)</span></li><li>None/.config/finalrecon/keys.json:1 <span class="note">— revisar y borrar</span></li><li>asm_scan.py:2311 <span class="note">— STRIX_* por entorno</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Rotar y sacar key.pem del repo (ruta externa + variable)</strong></li><li><strong>Auditar y eliminar keys.json abandonado</strong></li><li><strong>Centralizar config validada al arranque con .env.example</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-d" id="api-versioning">
+    <div class="facet-head">
+      <span class="letter">D</span>
+      <div>
+        <h3>API versioning</h3>
+        <p class="sub">weight ×1 · Sin versionado; rutas se rompen por revisión</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class=""></span>
+      <span class="on"></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Sin <code>/v1</code> ni estrategia: en dos semanas se eliminaron 10+ rutas (ppasivo/bancolombia/scor3bank/GC/B1/B2) cambiando la API. Consumidores internos (la propia UI) se adaptan a mano.</p><p>Aceptable solo porque el único consumidor es la UI servida.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>static/dashboard.html:1 <span class="note">— único consumidor, adaptado a mano</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Versionar /api/v1 y congelar lo existente</strong></li><li><strong>Changelog de API en docs/ ante cada retiro</strong></li><li><strong>Test de contrato que liste rutas vivas vs UI</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="layering-depth">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Layering depth</h3>
+        <p class="sub">weight ×3 · Archivos dios planos sin capas intermedias</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>No hay exceso de capas: un escaneo va de <code>dashboard_server.py</code> a subproceso y de <code>asm_scan.py</code> a módulos directos. El problema inverso es el tamaño: <code>generate_b6_unified_report.py</code> (3900 líneas, 50 funciones) y <code>asm_scan.py</code> (2500 líneas) mezclan scoring, render, parsing y texto en un solo archivo.</p><p>Navegable porque todo está a un grep de distancia, pero cada cambio en B6 exige cargar el archivo entero. Sin capas de más, con archivos de más.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>generate_b6_unified_report.py:1 <span class="note">— 3900 líneas, 50 funciones</span></li><li>asm_scan.py:2204 <span class="note">— _scan_provider con 15+ fases inline</span></li><li>kumo_engine.py:1 <span class="note">— 263 KB en un solo módulo</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Partir B6 en scoring.py, render.py y textos.py sin cambiar salidas</strong></li><li><strong>Extraer el pipeline de _scan_provider a fases nombradas importables</strong></li><li><strong>Poner tope de tamaño por generador (p. ej. 1200 líneas) en pr-validati</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="domain-boundary-clarity">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Domain boundary clarity</h3>
+        <p class="sub">weight ×3 · Raíz plana, dominio visible en nombres</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>No hay paquetes: todo cuelga de la raíz y cualquier módulo importa a cualquier otro (<code>generate_b6</code> importa B5, B7, precia, severity). A cambio, el dominio sí se lee en los nombres (B3-B7, TPRA, pasivo/semi_canon, owasp_*).</p><p>Un cambio de scoring toca un archivo predecible; un cambio transversal (severidades) ya cruzó 6 archivos sin un punto único. Sin grab-bag common/, pero sin fronteras que lo impidan.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>generate_b6_unified_report.py:42 <span class="note">— importa B7 y B5 directamente</span></li><li>AGENTS.md:84 <span class="note">— documenta el mapa de módulos</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Agrupar scanner/, reports/ y exports/ en paquetes con imports declarad</strong></li><li><strong>Prohibir imports cruzados entre generadores salvo vía módulos comparti</strong></li><li><strong>Documentar el grafo de imports permitido en AGENTS.md</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="naming-consistency">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Naming consistency</h3>
+        <p class="sub">weight ×3 · Bilingüe ES/EN con convención dominante parcial</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Conviven <code>hallazgos</code> con <code>build_findings/all_findings</code>, <code>mueve_a</code> con <code>score_general</code>, prefijos crípticos (<code>_ded, _ov, _b7</code>) y el typo intencional <code>pasive</code> documentado. Se adivina bastante, pero hay que saber los dos idiomas y los alias.</p><p>La parte nueva (severity, owasp_web, vex) sí sigue un vocabulario único. Lo viejo no se ha renombrado.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>pasivo_canon.py:1 <span class="note">— collect_pasive_items con typo documentado</span></li><li>generate_b6_unified_report.py:1262 <span class="note">— _mueve_a con reglas D/G/O</span></li><li>severity.py:1 <span class="note">— normalize/sarif_level/rank como vocabulario único</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Fijar glosario ES-visible / EN-interno en AGENTS.md y aplicarlo a lo n</strong></li><li><strong>Renombrar _ded/_ov/_b7 a nombres completos en B6</strong></li><li><strong>Unificar severidades de salida a mayúsculas inglesas vía severity.py</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="maintenance-effort">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Maintenance effort</h3>
+        <p class="sub">weight ×3 · Hotspots gigantes con higiene activa</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>158 marcadores TODO/FIXME/HACK y el churn concentrado en los generadores unificados (B6 cambia casi cada commit). A favor: limpieza reciente de 41 scripts debris, backups con nombre, commits convencionales atómicos y suite de 34 tests que cubre lo nuevo.</p><p>Predecible pero no gratis: cada feature de scoring toca archivos de 200+ KB.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>generate_b6_unified_report.py:1 <span class="note">— hotspot principal, 3900 líneas</span></li><li>tests/:1 <span class="note">— 34 tests solo de módulos nuevos</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Medir churn trimestral y partir el archivo que más cambie</strong></li><li><strong>Convertir TODOs con dueño en issues o borrarlos</strong></li><li><strong>Exigir test por cada fix de scoring (ya es norma en CI)</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="dead-code">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Dead code</h3>
+        <p class="sub">weight ×2 · Un cadáver grande y varios pequeños</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p><code>zz_b3_backup_test.py</code> (206 KB) no lo referencia nadie: copia muerta de B3. Más <code>dashboard.html</code> legacy, <code>None/</code> y botones retirados ya limpiados de la UI servida.</p><p>Nada de esto se ejecuta (dashboard solo llama generadores vivos), pero confunde al lector.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>zz_b3_backup_test.py:1 <span class="note">— 206 KB sin referencias</span></li><li>dashboard.html:1 <span class="note">— no servido</span></li><li>None/.config/finalrecon/keys.json:1 <span class="note">— basura con posible secreto</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Borrar zz_b3_backup_test.py tras confirmar backup</strong></li><li><strong>Auditar keys.json de None/ antes de borrar el dir</strong></li><li><strong>Añadir job CI que falle si aparece *.bak/check_*/fix_* en raíz</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="api-completeness">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>API completeness</h3>
+        <p class="sub">weight ×2 · REST funcional sin contrato publicado</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>El dashboard expone ~30 rutas coherentes (scan, history, downloads) con envelopes dispares por endpoint y sin OpenAPI del propio dashboard (el export OpenAPI describe los ASM, no la API). Sin paginación más allá del tope de 80 en historial.</p><p>Integra leyendo código o probando; los errores son HTTPException con mensajes ad hoc.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>dashboard_server.py:625 <span class="note">— app FastAPI sin schema publicado</span></li><li>static/dashboard.html:715 <span class="note">— tabla de APIs solo en la UI</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Publicar openapi.json del dashboard desde FastAPI</strong></li><li><strong>Unificar envelope de error {code, message, hint}</strong></li><li><strong>Paginar /api/history con limit/offset</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="storage-simplicity">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Storage simplicity</h3>
+        <p class="sub">weight ×2 · Un sqlite sin migraciones más ficheros</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Un solo store (<code>scan_history.db</code>) más JSON/PDF en disco por escaneo: simple de entender. Sin herramienta de migraciones (DDL inline con IF NOT EXISTS) y la BD binaria genera ruido en git a cada escaneo.</p><p>Funciona; evolucionar el esquema será manual.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>dashboard_server.py:62 <span class="note">— DDL inline del historial</span></li><li>dashboard_workspace/:1 <span class="note">— un dir por escaneo</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Extraer schema.sql versionado y migraciones mínimas</strong></li><li><strong>Sacar scan_history.db del seguimiento o documentar su ruido</strong></li><li><strong>Definir retención/prune de dashboard_workspace/history</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="dependency-health">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Dependency health</h3>
+        <p class="sub">weight ×2 · Pineado sin lockfile, una deuda conocida</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Pines exactos en <code>requirements*.txt</code>, sin lockfile ni hashes; sin librerías duplicadas; superficie pequeña (requests, dnspython, fastapi, uvicorn, playwright). Deuda declarada en el propio archivo: dnspython 2.3.0 < mínimo pedido 2.4.0 pendiente de subir.</p><p>Sano pero sin red de seguridad ante supply-chain.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>requirements.txt:1 <span class="note">— pines + nota de deuda dnspython</span></li><li>requirements-dashboard.txt:1 <span class="note">— pines dashboard</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Subir dnspython a >=2.4.0 y re-probar (deuda declarada)</strong></li><li><strong>Añadir pip-audit ya existe en CI: fijar umbral de fallo</strong></li><li><strong>Evaluar hash-pinning para despliegues</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="test-coverage-quality">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Test coverage & quality</h3>
+        <p class="sub">weight ×2 · Núcleo nuevo cubierto, superficie vasta sin tests</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>34 tests stdlib rápidos y deterministas sobre severidad, OWASP, exportes y guardarrailes, corriendo en CI en dos intérpretes. Cero tests de generadores (los 3900-líneas), dashboard y escáner: lo que más cambia es lo menos probado.</p><p>Los tests que existen nombran el comportamiento roto.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>tests/test_score_mapeado.py:1 <span class="note">— mapeo B6-B7 y conteos</span></li><li>tests/test_exports.py:1 <span class="note">— SARIF/VEX/SBOM</span></li><li>.github/workflows/pr-validation.yml:1 <span class="note">— unittest en CI</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Añadir test de render dorado por generador (HTML contiene bloques)</strong></li><li><strong>Test de build_findings con JSON sintético por nivel</strong></li><li><strong>Medir cobertura solo de módulos nuevos y fijar suelo</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="local-dev-experience">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Local dev experience</h3>
+        <p class="sub">weight ×2 · Varios pasos manuales encadenados</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p><code>.venv</code> por proyecto y pines exactos ayudan; pero arrancar pide Python 3.11 en ruta exacta, <code>playwright install chromium</code>, servicio NSSM aparte y keys externas opcionales. <code>start_dashboard.ps1</code> existe. Sin comando único ni seed data.</p><p>Documentado en AGENTS.md; funciona siguiéndolo al pie de la letra.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>start_dashboard.ps1:1 <span class="note">— arranque manual</span></li><li>requirements-dashboard.txt:1 <span class="note">— falta browser + servicio</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Script único start.ps1 que verifique venv+deps+browser+servicio</strong></li><li><strong>Documentar matriz Python 3.11 vs 3.12 (Strix pide 3.12+)</strong></li><li><strong>Añadir datos semilla para desarrollo sin red</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="data-model-migrations">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Data model & migrations</h3>
+        <p class="sub">weight ×1 · Esquema mínimo sin migraciones</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Una tabla principal (<code>scan_history</code>) creada inline; el resto son ficheros. Riesgo bajo hoy, deuda si el esquema crece (ya hay <code>save_factor_history</code> segunda escritura).</p><p></p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>dashboard_server.py:62 <span class="note">— DDL inline</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>schema.sql versionado + migraciones mínimas</strong></li><li><strong>Tipos/contrato del JSON canónico asm_report.json documentado</strong></li><li><strong>Consolidar con el fix de mayor impacto de esta faceta</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="deployment-complexity">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Deployment complexity</h3>
+        <p class="sub">weight ×1 · Servicio Windows manual, entendible</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Un servicio NSSM + comando documentado + <code>sc.exe</code> para reiniciar; sin contenedores ni IaC; solo cambia <code>dashboard_server.py/static</code> lo que exige reinicio. Despliegue entendible en una tarde, con pasos manuales.</p><p></p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>AGENTS.md:165 <span class="note">— servicio NSSM documentado</span></li><li>cert.pem:1 <span class="note">— TLS manual</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Documentar runbook de despliegue limpio (paso a paso numerado)</strong></li><li><strong>Generar y rotar cert fuera del repo</strong></li><li><strong>Evaluar contenedor solo si aparece segundo entorno</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="observability">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Observability</h3>
+        <p class="sub">weight ×1 · Logs buenos, sin métricas ni trazas</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p><code>log_utils</code> + <code>scan.log</code> + log por escaneo con timings por fase; sin métricas, sin correlation IDs, sin health endpoint. Un fallo se diagnostica leyendo logs, no dashboards.</p><p>Suficiente para un operador, ciego para SLOs.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>log_utils.py:1 <span class="note">— logging central</span></li><li>asm_scan.py:2211 <span class="note">— timings por fase</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Añadir /api/health con estado de servicio y último escaneo</strong></li><li><strong>Correlation ID por escaneo en todos los logs</strong></li><li><strong>Contadores básicos (escaneos, fallos por fase) en log estructurado</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-c" id="error-handling">
+    <div class="facet-head">
+      <span class="letter">C</span>
+      <div>
+        <h3>Error handling</h3>
+        <p class="sub">weight ×1 · Tolerante por diseño, ruidoso por defecto</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class="on"></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>433 <code>except Exception</code> con filosofía documentada fail-soft (ninguna fuente tumba el escaneo) y timeouts en red. El costo: errores tragados en bordes y warnings que parecen fallos (InsecureRequestWarning en cada corrida).</p><p>Consistente en rutas principales, con huecos en bordes.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>asm_scan.py:2204 <span class="note">— try por fase de escaneo</span></li><li>llm_guardrails.py:1 <span class="note">— redacción de secretos en errores</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Distinguir warn/skip/error en el log por escaneo</strong></li><li><strong>Silenciar warnings conocidos o documentarlos</strong></li><li><strong>No capturar Exception desnuda en código nuevo (regla CI)</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-b" id="repo-navigability">
+    <div class="facet-head">
+      <span class="letter">B</span>
+      <div>
+        <h3>Repo navigability</h3>
+        <p class="sub">weight ×3 · AGENTS.md excelente, raíz con restos legacy</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class="on"></span><span class=""></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p><code>AGENTS.md</code> responde qué/cómo/dónde y se actualiza el mismo día del código; entrypoints obvios (<code>asm_scan.py --help</code>, dashboard 8765). Resta fricción: <code>dashboard.html</code> legacy en raíz, <code>NetSoc_OSINT/</code> untracked sin dueño y <code>None/</code> con basura de FinalRecon.</p><p>Un recién llegado arranca con una conversación corta: qué se versiona y qué es residuo.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>AGENTS.md:1 <span class="note">— blueprint actualizado 2026-10-14</span></li><li>None/ <span class="note">— dir basura de FinalRecon</span></li><li>dashboard.html:1 <span class="note">— legacy no servido (se sirve static/)</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Borrar None/, dashboard.html legacy y NetSoc_OSINT/ o documentarlos</strong></li><li><strong>Añadir README de 20 líneas que apunte a AGENTS.md como entrada</strong></li><li><strong>Fijar qué dirs se versionan y cuáles son runtime en .gitignore comenta</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-b" id="documentation-rot">
+    <div class="facet-head">
+      <span class="letter">B</span>
+      <div>
+        <h3>Documentation rot</h3>
+        <p class="sub">weight ×2 · Docs al día con el código, bordes por pulir</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class="on"></span><span class=""></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>AGENTS.md y COMPARATIVA se actualizaron el mismo día que los retiros de generadores; <code>--help</code> coincide con el uso real. Bordes: sin <code>.env.example</code> (23 lecturas de entorno entre <code>STRIX_*</code> y <code>ASM_*</code>) y la metodología vive repartida entre AGENTS, COMPARATIVA y anexos.</p><p>Un clon limpio funciona siguiendo docs; las keys externas se descubren al fallar en tolerante.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>AGENTS.md:147 <span class="note">— CLI documentado al día</span></li><li>requirements.txt:1 <span class="note">— pin dnspython comentado como pendiente</span></li><li>integrations_config.json:1 <span class="note">— keys sin ejemplo documentado</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Añadir .env.example con todas las variables que lee el código</strong></li><li><strong>Generar la tabla de métricas desde el código en vez de mantenerla a ma</strong></li><li><strong>Unificar metodología en un solo docs/METODOLOGIA (ya existe base)</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-b" id="service-coupling">
+    <div class="facet-head">
+      <span class="letter">B</span>
+      <div>
+        <h3>Service coupling</h3>
+        <p class="sub">weight ×2 · Muchas dependencias externas, todas fail-soft</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class="on"></span><span class=""></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>El escáner llama a 10+ APIs públicas (crt.sh, Shodan, OTX, KUMO, Prism, LLMs) y el dashboard a generadores por subproceso + JSON: acoplamiento flojo real. Todo fallo externo es SKIP tolerante con log; ningún proveedor caído rompe un escaneo.</p><p>La contrapartida es no-determinismo entre corridas (conteos que se mueven).</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>asm_scan.py:2204 <span class="note">— _scan_provider con try por fase</span></li><li>external_sources.py:1 <span class="note">— fuentes con degradación elegante</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Fijar timeouts y reintentos por fuente en un solo config</strong></li><li><strong>Marcar en el informe qué fuentes fallaron por escaneo</strong></li><li><strong>Cachear respuestas OSINT por dominio+fecha para reproducibilidad</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-b" id="performance-shape">
+    <div class="facet-head">
+      <span class="letter">B</span>
+      <div>
+        <h3>Performance shape</h3>
+        <p class="sub">weight ×1 · Pools acotados y timeouts; sin medir</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class="on"></span><span class=""></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>ThreadPools acotados (300 puertos, 100 brute), timeouts en cada sonda, historial topado a 80. Sin N+1 ni lecturas ilimitadas obvias; sin datos medidos de duración por nivel.</p><p>Estructuralmente sano, sin evidencia de carga.</p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>asm_scan.py:2298 <span class="note">— port scan acotado</span></li><li>asm_scan.py:2310 <span class="note">— brute acotado</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>Publicar duraciones típicas por nivel en docs</strong></li><li><strong>Timeout global por escaneo con cancelación limpia</strong></li><li><strong>Medir pico de memoria en invasivo antes de paralelizar más</strong></li>
+      </ol>
+    </div>
+  </section>
+<section class="card facet g-na" id="event-contract-quality">
+    <div class="facet-head">
+      <span class="letter">N/A</span>
+      <div>
+        <h3>Event contract quality</h3>
+        <p class="sub">weight ×2 · Sin mensajería asíncrona</p>
+      </div>
+    </div>
+    <div class="scale">
+      <span class=""></span><span class=""></span><span class=""></span>
+      <span class=""></span><span class=""></span><span class=""></span>
+    </div>
+    <div class="assessment">
+      <p>Todo es request/response síncrono (HTTP + subprocesos + JSON en disco). No hay colas, eventos ni contratos async que graduar.</p><p></p>
+    </div>
+    <div class="evidence">
+      <h4>Evidence</h4>
+      <ul>
+        <li>AGENTS.md:1 <span class="note">— contexto general</span></li>
+      </ul>
+    </div>
+    <div class="paths">
+      <h4>Paths to improvement</h4>
+      <ol>
+        <li><strong>No aplica; si aparece una cola, definir schemas versionados desde el d</strong></li><li><strong>Consolidar con el fix de mayor impacto de esta faceta</strong></li><li><strong>Consolidar con el fix de mayor impacto de esta faceta</strong></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="card method">
+    <h2 class="section">Methodology</h2>
+    <p>Each facet is graded A–F against a fixed rubric and converted to points (A=5, B=4, C=3, D=2, E=1, F=0). The overall grade is the weighted mean of those points, mapped back to a letter at ≥4.5 A, ≥3.5 B, ≥2.5 C, ≥1.5 D, ≥0.5 E, else F. Weights favour the facets that drive maintenance cost and discoverability. Facets marked N/A are excluded from both sides of the average.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Weight</th><th>Facets</th></tr></thead>
+        <tbody>
+          <tr><td>×3</td><td>logic duplication, layering depth, domain boundary clarity, naming consistency, repo navigability, maintenance effort</td></tr>
+          <tr><td>×2</td><td>documentation rot, dead code, API completeness, API security, event contract quality, storage simplicity, service coupling, config &amp; secrets, dependency health, test coverage &amp; quality, local dev experience</td></tr>
+          <tr><td>×1</td><td>API versioning, data model &amp; migrations, deployment complexity, observability, error handling, performance shape</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Scope.</strong> Repo asm-incocredito-proveedores completo; lectura total del núcleo (~15 archivos) y grep en el resto.</p>
+    <p><strong>Excluded.</strong> Vendorizados prism_osint/ y claude_osint_scripts/ (solo interfaz); .venv, __pycache__, dashboard_workspace/history.</p>
+    <p><strong>Confidence.</strong> N/A solo en eventos (sin mensajería). Pesos de severidad inferidos de Threat Level y severidad interna donde el código no los declara.</p>
+  </section>
+
+  <footer>Generated by the <code>service-scorecard</code> skill · 2026-10-14</footer>
+
+</div>
+</body>
+</html>

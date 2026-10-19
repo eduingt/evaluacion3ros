@@ -306,19 +306,10 @@ def factor_incidences(p: dict[str, Any]) -> dict[str, int]:
     return out
 
 def overall_score(factors: dict[str,int]) -> int:
+    # v3.0 (SSC Methodology Deep Dive 3.0): sin pesos por factor; promedio simple.
     if not factors: return 0
     vals = list(factors.values())
-    # ponderacion: network, dns, patching, iprep, appsec pesan 1.2x (criticos)
-    weights = {"network":1.2,"dns":1.2,"patching":1.2,"endpoint":1.0,"iprep":1.2,"appsec":1.2,"cubit":0.8,"chatter":0.8,"leak":1.0,"social":0.9}
-    tot_w = sum(weights.get(k,1.0) for k in vals)
-    # actually sum weighted
-    s = 0.0
-    wsum = 0.0
-    for k,v in factors.items():
-        w = weights.get(k,1.0)
-        s += v * w
-        wsum += w
-    return int(round(s / wsum)) if wsum else 0
+    return int(round(sum(vals) / len(vals))) if vals else 0
 
 def threat_indicators(p: dict[str,Any], factors: dict[str,int] | None = None) -> int:
     # conteo de hallazgos ponderados (similar a SecurityScorecard Threat Indicators)
@@ -582,7 +573,7 @@ def render_precialike_block(p: dict[str,Any], analista: str = "@eduingt", org: s
               <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><span style="width:14px; height:0; border-top:2.5px solid #173B57; display:inline-block; vertical-align:middle;"></span> Sólido azul = Tú ({org_show[:18]})</div>
               <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;"><span style="width:14px; height:0; border-top:1.5px dashed #9CA3AF; display:inline-block; vertical-align:middle;"></span> Discontinua gris = Industria ({_esc(detected_industry)} {industry_avg})</div>
               <div style="display:flex; align-items:center; gap:6px;"><span style="width:10px; height:10px; border:1px solid #D1D5DB; border-radius:50%; display:inline-block;"></span> Anillo ext. = 100</div>
-              <div style="margin-top:6px; font-size:5.5px; color:#6B7280; line-height:1.3; font-style:italic;">Valores &lt;70 en amarillo/rojo requieren plan. Ponderación: Network/DNS/Patching/IPRep/AppSec ×1.2</div>
+               <div style="margin-top:6px; font-size:5.5px; color:#6B7280; line-height:1.3; font-style:italic;">Valores &lt;70 en amarillo/rojo requieren plan. Sin pesos por factor (SSC v3.0).</div>
             </div>
           </div>
           <div style="margin-top:4px; font-size:6px; color:#6B7280; text-align:center;"><span style="display:inline-block; width:8px; height:8px; background:#2F6F9F; opacity:0.18; border:1px solid #173B57; vertical-align:middle; margin-right:4px;"></span> Tú ({org_show}) <span style="margin:0 8px; display:inline-block; width:12px; height:0; border-top:1.5px dashed #9CA3AF; vertical-align:middle;"></span> Industria {_esc(detected_industry)}</div>

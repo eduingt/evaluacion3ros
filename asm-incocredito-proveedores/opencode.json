@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "watcher": {
+    "ignore": [
+      ".venv/**",
+      "__pycache__/**",
+      "tools/_archive/**",
+      "dashboard_workspace/**",
+      "salida_test/**",
+      "logs/**",
+      "vulndb/**",
+      "*.html",
+      "asm_report.json",
+      "*.log",
+      "*.pem",
+      "*.key"
+    ]
+  },
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "tools/_archive/**": "deny"
+  }
+}

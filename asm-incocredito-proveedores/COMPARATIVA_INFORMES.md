@@ -1,5 +1,11 @@
 # Comparativa de Contenido por Informe
 
+> **RETIRADOS 2026-10-14**: Cibest, Beta1 y B2 Scorecard (mismo motivo).
+> **RETIRADOS 2026-10-13**: Bancolombia, Scor3Bank y Ppasivo (generador ausente en disco,
+> endpoints dados de baja en `dashboard_server.py`). Sus columnas/filas abajo se conservan
+> como referencia historica. B4/B5/B6 comparten la base de B3 (misma cobertura); B7 es
+> SSC-style (ver `generate_b7_unified_report.py:collect_issues`) y no esta tabulado aqui.
+
 Leyenda: ✅ = Incluye | ❌ = No incluye | ~ = Parcial
 
 | # | Item Evaluado | SOCRadar | Bancolombia | Cibest | Scor3Bank | Beta1 | B2 SC | B3 Unif | PA | Ppasivo |
@@ -50,28 +56,28 @@ Leyenda: ✅ = Incluye | ❌ = No incluye | ~ = Parcial
 | Informe | Items incluidos | Items excluidos | Cobertura |
 |---|---|---|---|
 | **SOCRadar** | 38 | 2 | 95.0% |
-| **Bancolombia** | 38 | 2 | 95.0% |
-| **Cibest** | 38 | 2 | 95.0% |
-| **Scor3Bank** | 36 | 4 | 90.0% |
-| **Beta1** | 37 | 3 | 92.5% |
-| **B2 Scorecard** | 37 | 3 | 92.5% |
+| **Bancolombia** (RETIRADO) | 38 | 2 | 95.0% |
+| **Cibest** (RETIRADO) | 38 | 2 | 95.0% |
+| **Scor3Bank** (RETIRADO) | 36 | 4 | 90.0% |
+| **Beta1** (RETIRADO) | 37 | 3 | 92.5% |
+| **B2 Scorecard** (RETIRADO) | 37 | 3 | 92.5% |
 | **B3 Unified** | 37 | 3 | 92.5% |
 | **PA (Passive/Active)** | 38 | 2 | 95.0% |
-| **Ppasivo** | 19 | 21 | 47.5% |
+| **Ppasivo** (RETIRADO) | 19 | 21 | 47.5% |
 
 ## Items excluidos por informe
 
 | Informe | Excluye |
 |---|---|
 | **SOCRadar** | — |
-| **Bancolombia** | — |
-| **Cibest** | — |
-| **Scor3Bank** | OWASP |
-| **Beta1** | (ninguno — cobertura completa) |
-| **B2 SC** | (ninguno — cobertura completa) |
+| **Bancolombia** (RETIRADO) | — |
+| **Cibest** (RETIRADO) | — |
+| **Scor3Bank** (RETIRADO) | OWASP |
+| **Beta1** (RETIRADO) | (ninguno — cobertura completa) |
+| **B2 SC** (RETIRADO) | (ninguno — cobertura completa) |
 | **B3 Unif** | (ninguno — cobertura completa) |
 | **PA** | — |
-| **Ppasivo** | Banner Grab, CVE, API Endpoints, TLS, HTTP, Ports, CSP, Cookies, FinalRecon, Brute Subs, SAN, Supply Chain, Social, OWASP, EPSS/KEV, Public Paths |
+| **Ppasivo** (RETIRADO) | Banner Grab, CVE, API Endpoints, TLS, HTTP, Ports, CSP, Cookies, FinalRecon, Brute Subs, SAN, Supply Chain, Social, OWASP, EPSS/KEV, Public Paths |
 
 ## Notas
 

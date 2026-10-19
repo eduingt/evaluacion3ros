@@ -7,19 +7,20 @@ con estilo visual B2 (corporativo blanco/azul #173B57) y datos 100% reales.
 
 Basado en B3 (B5-v1.0 2026-09-24): cover, resumen, factor score,
 pasivo/activo, matriz de riesgo, hallazgos, recomendaciones RACI, anexos A-F.
-Sin dependencias rotas: no requiere salida_test/informe_unificado_b3.html
+Sin dependencias rotas: no requiere salida_test/informe_unificado_b5.html
 ni domain_score_legend. Todo se genera desde asm_report.json.
 """
 
 from __future__ import annotations
 import argparse
 import json
+import severity
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
+FORMULA_VERSION = "B5-v3.0"
 
-FORMULA_VERSION = "B5-v1.0"
-FORMULA_DATE = "2026-09-24"
+FORMULA_DATE = "2026-10-11"
 
 try:
     from score_legend import render_score_legend as _render_score_legend
@@ -36,6 +37,46 @@ except Exception:
     _render_precialike = None  # type: ignore
     _PRECIA_FACTORS, _INDUSTRY_AVG, _precia_scores = [], {}, None  # type: ignore
     _precia_overall, _precia_threats, _precia_industry, _render_radar = None, None, None, None  # type: ignore
+
+try:
+    import oasm_enrich as _oasm
+except Exception:
+    _oasm = None  # type: ignore
+
+try:
+    import easyeasm_enrich as _eeasm
+except Exception:
+    _eeasm = None  # type: ignore
+
+try:
+    import scorecard_enrich as _sc
+except Exception:
+    _sc = None  # type: ignore
+
+try:
+    import origin_ip as _origin
+except Exception:
+    _origin = None  # type: ignore
+
+try:
+    import dns_extra as _dnsx
+except Exception:
+    _dnsx = None  # type: ignore
+
+try:
+    import hotlist as _hotlist
+except Exception:
+    _hotlist = None  # type: ignore
+
+try:
+    import xorcism_enrich as _xen
+except Exception:
+    _xen = None  # type: ignore
+
+try:
+    import rengine_enrich as _rng
+except Exception:
+    _rng = None  # type: ignore
 
 
 def _sc_color(s: int) -> str:
@@ -68,21 +109,21 @@ def _factor_bilingual(key: str, en: str) -> str:
 
 
 _FACTOR_BILINGUAL_ES_FIRST = {
-    "network": "Seguridad de red/Network security",
-    "dns": "Salud de DNS/DNS health",
-    "patching": "Cadencia de parches/Patching cadence",
-    "endpoint": "Seguridad de endpoints/Endpoint security",
-    "iprep": "Reputación de IP/IP reputation",
-    "appsec": "Seguridad de aplicaciones/Application security",
+    "network": "SEGURIDAD DE RED",
+    "dns": "SALUD DE DNS",
+    "patching": "CADENCIA DE PARCHES",
+    "endpoint": "SEGURIDAD DE ENDPOINTS",
+    "iprep": "REPUTACIÓN DE IP",
+    "appsec": "SEGURIDAD DE APLICACIONES",
     "cubit": "Cubit Score",
-    "chatter": "Actividad hacker/Hacker chatter",
-    "leak": "Filtración de información/Information leak",
-    "social": "Ingeniería social/Social engineering",
+    "chatter": "ACTIVIDAD HACKER",
+    "leak": "FILTRACIÓN DE INFORMACIÓN",
+    "social": "INGENIERÍA SOCIAL",
 }
 
 
 def _factor_bilingual_es(key: str, en: str) -> str:
-    """Nombre bilingüe ES primero en minúsculas con inicial mayúscula para desglose §3."""
+    """Nombre del factor solo en español para el panel Scorecard."""
     return _FACTOR_BILINGUAL_ES_FIRST.get(key, en)
 
 _FACTOR_FINDING_CATS = {
@@ -211,9 +252,9 @@ def precia_deductions(p: dict[str, Any]) -> dict[str, list[tuple[str, int]]]:
     if not (headers.get("content-security-policy") or headers.get("content-security-policy-report-only")):
         ap.append(("Sin CSP", -20))
     elif csp_f:
-        crit = sum(1 for f in csp_f if isinstance(f, dict) and f.get("severity") == "high")
+        crit = sum(1 for f in csp_f if isinstance(f, dict) and severity.normalize(f.get("severity")) == "high")
         ap.append(("CSP debil", -15 if crit else -7))
-    if any(isinstance(f, dict) and f.get("severity") == "high" for f in cookie_f):
+    if any(isinstance(f, dict) and severity.normalize(f.get("severity")) == "high" for f in cookie_f):
         ap.append(("Cookies high", -15))
     elif cookie_f:
         ap.append(("Cookies", -7))
@@ -320,17 +361,17 @@ _DISP_SEV = {"CRITICA": "CRÍTICA", "ALTA": "ALTA", "MEDIA": "MEDIA", "BAJA": "B
 
 
 def _overall_contrib_table(scores: dict[str, int], incidences: dict[str, int] | None = None, deductions: dict[str, list[tuple[str, int]]] | None = None, findings: list[dict[str, Any]] | None = None) -> str:
-    """Tabla auditable SCORE | FACTOR | INCIDENCIAS | PESO | CONTRIBUCIÓN | DESGLOSE | VER sección 8 para Puntuación Global (B5, ref imagen B4)."""
+    """Tabla auditable SCORE | FACTOR | INCIDENCIAS | CONTRIBUCIÓN | DESGLOSE | VER sección 8 para Puntuación Global (B5, ref imagen B4). Sin pesos (SSC v3.0)."""
     try:
-        total_w = sum(_PRECIA_WEIGHTS.get(k, 1.0) for k in scores)
         incidences = incidences or {}
         deductions = deductions or {}
         rows = ""
         total_inc = 0
+        sum_contrib = 0.0
         for label, _, key in _PRECIA_FACTORS:
             s = int(scores.get(key, 0))
-            w = _PRECIA_WEIGHTS.get(key, 1.0)
-            contrib = round(s * w / total_w, 2) if total_w else 0
+            contrib = round(s / 10.0, 2)
+            sum_contrib += contrib
             n = int(incidences.get(key, 0) or 0)
             total_inc += n
             sc = _sc_color(s)
@@ -350,14 +391,14 @@ def _overall_contrib_table(scores: dict[str, int], incidences: dict[str, int] | 
                 refs = _finding_refs(key, findings, [lbl for lbl, _ in deductions.get(key, [])])
             except Exception:
                 refs = "—"
-            rows += f"<tr><td class='num' style='color:{sc}; font-weight:800;'>{s}</td><td>{esc(_factor_bilingual_es(key, label))}</td><td class='num' style='{inc_style}'>{n}</td><td class='num'>×{w:g}</td><td class='num'>{contrib:.2f}</td><td style='font-size:7pt;'>{desglose}</td><td class='num' style='font-size:7pt; white-space:nowrap;'>{refs}</td></tr>"
-        rows += f"<tr style='background:#EEF1F5; font-weight:800;'><td class='num'>—</td><td>TOTAL</td><td class='num' style='color:#173B57;'>{total_inc}</td><td class='num'>Σ={total_w:.1f}</td><td class='num'>—</td><td style='font-size:6pt; color:#6B7280;'>ΣContrib=Puntuación Global</td><td class='num'>—</td></tr>"
+            rows += f"<tr><td class='num' style='color:{sc}; font-weight:800;'>{s}</td><td>{esc(_factor_bilingual_es(key, label))}</td><td class='num' style='{inc_style}'>{n}</td><td class='num'>{contrib:.2f}</td><td style='font-size:7pt;'>{desglose}</td><td class='num' style='font-size:7pt; white-space:nowrap;'>{refs}</td></tr>"
+        rows += f"<tr style='background:#EEF1F5; font-weight:800;'><td class='num'>—</td><td>TOTAL</td><td class='num' style='color:#173B57;'>{total_inc}</td><td class='num'>{sum_contrib:.2f}</td><td style='font-size:6pt; color:#6B7280;'>ΣContrib≈Overall</td><td class='num'>—</td></tr>"
         return (
             '<div style="margin:0 16px 12px; background:#fff; border:1px solid #D9DEE3; border-radius:8px; padding:10px; page-break-before:always;">'
             f'<div style="font-size:7.5pt; font-weight:800; letter-spacing:.06em; color:#1A3A4A; text-transform:uppercase; margin-bottom:6px;">PUNTUACIÓN GLOBAL — DESGLOSE AUDITABLE</div>'
-            '<table class="data" style="font-size:7pt;"><thead><tr><th>SCORE</th><th>FACTOR DE RIESGO</th><th>INCIDENCIAS/ISSUES</th><th>PESO</th><th>CONTRIBUCIÓN</th><th>DESGLOSE</th><th>VER sección 8</th></tr></thead>'
+            '<table class="data" style="font-size:7pt;"><thead><tr><th>SCORE</th><th>FACTOR DE RIESGO</th><th>INCIDENCIAS</th><th>CONTRIBUCIÓN</th><th>DESGLOSE</th><th>VER sección 8</th></tr></thead>'
             f"<tbody>{rows}</tbody></table>"
-            f"<div style='font-size:6px; color:#6B7280; margin-top:4px;'>Puntuación Global = Σ(Score×Peso)/ΣPesos · ΣPesos={total_w:.1f} · ΣContribuciones = Puntuación Global · ΣIncidencias/Issues={total_inc} (de {len(findings or [])} hallazgos totales; {max(0, len(findings or [])-total_inc)} informativo/contextual no afecta Overall) · Fórmula {FORMULA_VERSION} reproducible · Desglose: deducciones por hallazgo (ver sección 8)</div>"
+            f"<div style='font-size:6px; color:#6B7280; margin-top:4px;'>Puntuación Global = promedio simple de 10 factores (sin pesos, SSC v3.0) · ΣContribuciones = {sum_contrib:.2f} · ΣIncidencias={total_inc} (de {len(findings or [])} hallazgos totales; {max(0, len(findings or [])-total_inc)} informativo/contextual no afecta Overall) · Fórmula {FORMULA_VERSION} reproducible · Desglose: deducciones por hallazgo (ver sección 8)</div>"
             "</div>"
         )
     except Exception:
@@ -507,13 +548,18 @@ def _finding_refs(key: str, findings: list[dict[str, Any]] | None, labels: list[
 
 def render_scorecard_exact(p: dict[str, Any], analista: str = "", org: str | None = None,
                            generated: str | None = None, findings: list[dict[str, Any]] | None = None,
-                           prev_scores: dict[str, int] | None = None) -> str:
+                           prev_scores: dict[str, int] | None = None,
+                           scores_override: dict[str, int] | None = None,
+                           inc_override: dict[str, int] | None = None) -> str:
     """Replica exacta de la imagen SecurityScorecard con números 100% reales (via precia_scorecard)."""
     domain = p.get("domain", "")
     org_show = org or domain or p.get("name", "")
     disp_dom = domain.split(".")[0].title() + "." + ".".join(domain.split(".")[1:]) if "." in domain else domain
     try:
         scores = _precia_scores(p) or {}
+        if scores_override:
+            scores = dict(scores)
+            scores.update({k: int(v) for k, v in scores_override.items()})
         overall = int(_precia_overall(scores))
         threats = int(_precia_threats(p, scores))
         industry = _precia_industry(p)
@@ -533,6 +579,9 @@ def render_scorecard_exact(p: dict[str, Any], analista: str = "", org: str | Non
         inc = _incs(p) or {}
     except Exception:
         inc = {}
+    if inc_override:
+        inc = dict(inc)
+        inc.update({k: int(v) for k, v in inc_override.items()})
     cards = ""
     try:
         ded = precia_deductions(p)
@@ -542,13 +591,12 @@ def render_scorecard_exact(p: dict[str, Any], analista: str = "", org: str | Non
         s = int(scores.get(key, 0))
         n = int(inc.get(key, 0))
         col = _sc_color(s)
-        w = _PRECIA_WEIGHTS.get(key, 1.0)
         if n == 0:
-            pill_bg, pill_col, pill_txt = "#E8F5E9", "#2E7D32", "0 Incidencias/Issues"
+            pill_bg, pill_col, pill_txt = "#E8F5E9", "#2E7D32", "0 Incidencias"
         elif n == 1:
-            pill_bg, pill_col, pill_txt = "#FFF3E0", "#EF6C00", "1 Incidencia/Issue"
+            pill_bg, pill_col, pill_txt = "#FFF3E0", "#EF6C00", "1 Incidencia"
         else:
-            pill_bg, pill_col, pill_txt = "#FFEBEE", "#C62828", f"{n} Incidencias/Issues"
+            pill_bg, pill_col, pill_txt = "#FFEBEE", "#C62828", f"{n} Incidencias"
         dl = ded.get(key, [])
         if dl:
             shown = " · ".join(f"{lbl} {pts}" for lbl, pts in dl[:4])
@@ -573,7 +621,6 @@ def render_scorecard_exact(p: dict[str, Any], analista: str = "", org: str | Non
             '<div style="display:flex; justify-content:center; align-items:center; gap:6px;">'
             f'<div style="font-size:28px; font-weight:800; color:{col}; line-height:1;">{s}</div>'
             f'<span style="font-size:7px; font-weight:700; color:{pill_col}; background:{pill_bg}; border-radius:10px; padding:2px 6px; white-space:nowrap;">{pill_txt}</span>'
-            f'<span style="font-size:7px; font-weight:800; color:#173B57; background:#E8EEF5; border-radius:10px; padding:2px 6px; white-space:nowrap;" title="Peso en el Overall">×{w:g}</span>'
             "</div>"
             f"{trend}"
             f'<div style="font-size:8px; font-weight:800; letter-spacing:.05em; color:#111827; text-transform:uppercase; margin-top:6px;">{esc(_factor_bilingual_es(key, label))}</div>'
@@ -593,10 +640,10 @@ def render_scorecard_exact(p: dict[str, Any], analista: str = "", org: str | Non
     return (
         '<section style="background:#fff; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden; margin:14px 0; font-family:Arial,Helvetica,sans-serif;">'
         '<div style="padding:18px 20px 12px; text-align:center; border-bottom:1px solid #E5E7EB;">'
-        '<div style="font-size:8px; letter-spacing:.14em; color:#6B7280; text-transform:uppercase;">Security Summary Report</div>'
-        f'<div style="font-size:23px; font-weight:800; color:#111827; margin-top:4px;">Scorecard for {esc(disp_dom)}</div>'
-        f'<div style="font-size:8px; color:#6B7280; margin-top:4px;">Generated {esc(gen_txt)} by {esc(analista or "@eduingt")}, {esc(org_show)} - CONFIDENCIAL -- Uso interno</div>'
-        '<div style="font-size:7px; color:#9CA3AF; margin-top:2px;">powered by ASM - SecurityScorecard style</div>'
+        '<div style="font-size:8px; letter-spacing:.14em; color:#6B7280; text-transform:uppercase;">Resumen de Seguridad</div>'
+        f'<div style="font-size:23px; font-weight:800; color:#173B67; margin-top:4px;">Overall Scorecard para {esc(disp_dom)}</div>'
+        f'<div style="font-size:8px; color:#6B7280; margin-top:4px;">Generado {esc(gen_txt)} por {esc(analista or "@eduingt")}, {esc(org_show)} — CONFIDENCIAL — Uso interno</div>'
+        '<div style="font-size:7px; color:#9CA3AF; margin-top:2px;">Generado por ASM - estilo SecurityScorecard</div>'
         "</div>"
         '<div style="display:flex; align-items:center; padding:14px 20px; border-bottom:1px solid #E5E7EB;">'
         f'<div style="flex:1; text-align:center;"><div style="font-size:34px; font-weight:800; color:{ocol}; line-height:1;">{overall}</div><div style="font-size:8px; letter-spacing:.08em; color:#6B7280; text-transform:uppercase; margin-top:2px;">Overall Score</div></div>'
@@ -651,6 +698,9 @@ def render_scorecard_exact(p: dict[str, Any], analista: str = "", org: str | Non
         + _overall_calc_box(scores, overall, disp_dom) +
         "</section>"
     )
+
+
+_b5_sc_exact = render_scorecard_exact
 
 def _overall_calc_box(scores: dict[str, int], overall: int, disp_dom: str) -> str:
     """Recuadro ¿Cómo se calcula? del Overall Score con caso real del dominio."""
@@ -659,13 +709,13 @@ def _overall_calc_box(scores: dict[str, int], overall: int, disp_dom: str) -> st
         ranked = sorted(scores.items(), key=lambda kv: kv[1])
         ex = []
         for k, s in ranked[:2]:
-            ex.append(f"{_factor_bilingual_es(k, _labels.get(k, k))} {s} (x{_PRECIA_WEIGHTS.get(k, 1.0):g})")
-        example = f"Detalle {disp_dom}: " + " + ".join(ex) + f" ... = {overall} (promedio ponderado de 10 factores)."
+            ex.append(f"{_factor_bilingual_es(k, _labels.get(k, k))} {s}")
+        example = f"Detalle {disp_dom}: " + " + ".join(ex) + f" ... = {overall} (promedio simple de 10 factores)."
     except Exception:
         example = ""
     return (
         '<div style="margin:0 16px 14px; background:#fff; border:1px solid #D9DEE3; border-left:4px solid #2F6F9F; border-radius:6px; padding:12px 14px; font-size:9pt; color:#374151; line-height:1.65;">'
-        "<strong>¿Cómo se calcula el Overall Score?</strong> Promedio <strong>ponderado</strong> de 10 factores: cada score se multiplica por su peso (Network/DNS/Patching/IPRep/AppSec <strong>×1.2</strong>, resto ×1.0/×0.9/×0.8) y se divide por la suma de pesos. "
+        "<strong>¿Cómo se calcula el Overall Score?</strong> Promedio <strong>simple</strong> de 10 factores, sin pesos por factor (metodología SSC v3.0). "
         + esc(example) + " Validado: <strong>100</strong> = todos los factores en 100. "
         'Colores: <span style="color:#2E7D32;">■</span> ≥90 verde, <span style="color:#F9A825;">■</span> 70-89 amarillo, <span style="color:#EF6C00;">■</span> 60-69 naranja, <span style="color:#C62828;">■</span> &lt;60 rojo. '
         "</div>"
@@ -685,7 +735,6 @@ def render_traceability_table(all_findings: list[dict[str, Any]], providers: lis
         except Exception:
             _ded_overall = {}
         rows = ""
-        _total_w = sum(_PRECIA_WEIGHTS.get(k, 1.0) for k in scores) if scores else 10.5
         _audit_overall = []
         _score_before = 100.0
         for f in all_findings:
@@ -729,34 +778,29 @@ def render_traceability_table(all_findings: list[dict[str, Any]], providers: lis
                             break
                     if ded_overall:
                         break
-            weight = 1.0
-            for fk in _ded_overall:
-                if any(c in _norm(f.get("categoria","")) for c in _FACTOR_FINDING_CATS.get(fk, [])):
-                    weight = _PRECIA_WEIGHTS.get(fk, 1.0)
-                    break
             if not ded_label:
                 ded_overall = 0
-            contrib = round((ded_overall * weight / _total_w) if _total_w else 0, 2) if ded_overall else 0.0
+            contrib = round(ded_overall / 10.0, 2) if ded_overall else 0.0
             _score_after = round(max(0, _score_before + contrib), 2)
             _audit_overall.append((_score_before, fid, contrib, _score_after))
             _score_before = _score_after
             ownership = "first-party" if dom == p0.get("domain","") else "third-party/shared" if "TERCEROS" in cat.upper() else "first-party"
             evid = esc(str(f.get("evidencia",""))[:60].replace(chr(10)," "))
-            rows += f"<tr><td style='font-size:6.5pt; white-space:nowrap;'>{fid}</td><td style='font-size:6.5pt;'>{rule}</td><td style='font-size:6.5pt;'>{cat}</td><td style='font-size:6.5pt;'>{ded_label or '—'}</td><td class='num' style='font-size:6.5pt;'>{ded_overall if ded_overall else '—'}</td><td class='num' style='font-size:6.5pt;'>×{weight:g}</td><td class='num' style='font-size:6.5pt;'>{contrib:.2f}</td><td style='font-size:6.5pt;'>{evid}</td><td class='num' style='font-size:6.5pt;'>{dom[:12]}</td><td style='font-size:6.5pt;'>{ownership}</td><td style='font-size:6.5pt;'>{conf}</td><td style='font-size:6.5pt;'>{sev}</td><td style='font-size:6.5pt;'>{prio}</td></tr>"
+            rows += f"<tr><td style='font-size:6.5pt; white-space:nowrap;'>{fid}</td><td style='font-size:6.5pt;'>{rule}</td><td style='font-size:6.5pt;'>{cat}</td><td style='font-size:6.5pt;'>{ded_label or '—'}</td><td class='num' style='font-size:6.5pt;'>{ded_overall if ded_overall else '—'}</td><td class='num' style='font-size:6.5pt;'>{contrib:.2f}</td><td style='font-size:6.5pt;'>{evid}</td><td class='num' style='font-size:6.5pt;'>{dom[:12]}</td><td style='font-size:6.5pt;'>{ownership}</td><td style='font-size:6.5pt;'>{conf}</td><td style='font-size:6.5pt;'>{sev}</td><td style='font-size:6.5pt;'>{prio}</td></tr>"
         audit_rows = ""
         for before, fid, ded, after in _audit_overall[:12]:
             audit_rows += f"<tr><td class='num' style='font-size:6.5pt;'>{before:.1f}</td><td style='font-size:6.5pt;'>{fid}</td><td class='num' style='font-size:6.5pt;'>{ded}</td><td class='num' style='font-size:6.5pt; font-weight:700;'>{after:.1f}</td></tr>"
         if not rows:
-            rows = "<tr><td colspan='13' style='text-align:center; font-size:7pt; color:#6B7280;'>Sin hallazgos para trazabilidad</td></tr>"
+            rows = "<tr><td colspan='12' style='text-align:center; font-size:7pt; color:#6B7280;'>Sin hallazgos para trazabilidad</td></tr>"
         if not audit_rows:
             audit_rows = "<tr><td colspan='4' style='text-align:center; font-size:7pt; color:#6B7280;'>Sin auditoría</td></tr>"
         return (
-            '<div class="section-sub" style="page-break-before:always;">Trazabilidad hallazgo → regla → deducción → factor → peso → contribución</div>'
-            '<div class="info-box" style="font-size:7.5pt;">Cada fila muestra la cadena completa: <strong>hallazgo</strong> (ID estable) → <strong>regla</strong> (ej. CSP-BASE-URI-MISSING) → <strong>factor</strong> (Overall) → <strong>deducción</strong> (puntos) → <strong>peso</strong> (×1.2) → <strong>contribución</strong> (deducción×peso/ΣPesos). HSTS en Network y Cubit es <em>intencional</em>: son controles independientes con pesos distintos, documentado aquí para evitar doble conteo percibido.</div>'
-            '<div style="overflow-x:auto;"><table class="data" style="font-size:6.5pt;"><thead><tr><th>Finding ID</th><th>Rule ID</th><th>Categoría</th><th>Deducción</th><th>Puntos</th><th>Peso</th><th>Contrib.</th><th>Evidencia</th><th>Asset</th><th>Ownership</th><th>Conf.</th><th>Sev.</th><th>Prio</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+            '<div class="section-sub" style="page-break-before:always;">Trazabilidad hallazgo → regla → deducción → factor → contribución</div>'
+            '<div class="info-box" style="font-size:7.5pt;">Cada fila muestra la cadena completa: <strong>hallazgo</strong> (ID estable) → <strong>regla</strong> (ej. CSP-BASE-URI-MISSING) → <strong>factor</strong> (Overall) → <strong>deducción</strong> (puntos) → <strong>contribución</strong> (deducción/10, sin pesos por factor). HSTS en Network y Cubit es <em>intencional</em>: son controles independientes, documentado aquí para evitar doble conteo percibido.</div>'
+            '<div style="overflow-x:auto;"><table class="data" style="font-size:6.5pt;"><thead><tr><th>Finding ID</th><th>Rule ID</th><th>Categoría</th><th>Deducción</th><th>Puntos</th><th>Contrib.</th><th>Evidencia</th><th>Asset</th><th>Ownership</th><th>Conf.</th><th>Sev.</th><th>Prio</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
             '<div class="section-sub" style="margin-top:12px;">Auditoría Overall — score_before → finding → score_after (reproducible)</div>'
-            '<div class="info-box" style="font-size:7.5pt;">Ejemplo reproducible: Overall inicia 100 y cada hallazgo resta su deducción ponderada. ΣPesos=10.5. Esta tabla permite re-ejecutar el cálculo y verificar que no hay hallazgo sin deducción ni deducción sin hallazgo.</div>'
-            '<table class="data" style="font-size:7pt;"><thead><tr><th>Score_before</th><th>Finding ID</th><th>Contribución</th><th>Score_after</th></tr></thead><tbody>' + audit_rows + f'</tbody></table><div style="font-size:6px; color:#6B7280; margin-top:4px;">ΣContribuciones ponderadas = {100-overall:.1f} → 100 - {100-overall:.1f} = {overall} · Fórmula B5-v1.0 reproducible</div>'
+            '<div class="info-box" style="font-size:7.5pt;">Ejemplo reproducible: Overall inicia 100 y cada hallazgo resta su deducción entre 10 factores. Esta tabla permite re-ejecutar el cálculo y verificar que no hay hallazgo sin deducción ni deducción sin hallazgo.</div>'
+            '<table class="data" style="font-size:7pt;"><thead><tr><th>Score_before</th><th>Finding ID</th><th>Contribución</th><th>Score_after</th></tr></thead><tbody>' + audit_rows + f'</tbody></table><div style="font-size:6px; color:#6B7280; margin-top:4px;">ΣContribuciones = {100-overall:.1f} → 100 - {100-overall:.1f} = {overall} · Fórmula {FORMULA_VERSION} reproducible</div>'
         )
     except Exception as e:
         return f"<div class='info-box' style='font-size:7pt; color:#6B7280;'>Trazabilidad no disponible: {esc(str(e))}</div>"
@@ -924,7 +968,7 @@ def domain_score(p: dict[str, Any]) -> float:
         pts -= 4
     elif p.get("csp_findings"):
         csp_f = p.get("csp_findings") or []
-        if any(f.get("severity") == "high" for f in csp_f):
+        if any(severity.normalize(f.get("severity")) == "high" for f in csp_f):
             pts -= 3
         elif csp_f:
             pts -= 2
@@ -977,7 +1021,7 @@ def domain_score(p: dict[str, Any]) -> float:
     elif len(takeover) >= 1:
         pts -= 2
     cookie_f = p.get("cookie_findings") or []
-    if any(f.get("severity") == "high" for f in cookie_f):
+    if any(severity.normalize(f.get("severity")) == "high" for f in cookie_f):
         pts -= 3
     elif cookie_f:
         pts -= 1
@@ -1003,7 +1047,7 @@ def domain_deductions(p: dict[str, Any]) -> list[tuple[str, int]]:
         out.append(("CSP ausente", -4))
     elif p.get("csp_findings"):
         csp_f = p.get("csp_findings") or []
-        out.append(("CSP debil", -3 if any(f.get("severity") == "high" for f in csp_f) else -2))
+        out.append(("CSP debil", -3 if any(severity.normalize(f.get("severity")) == "high" for f in csp_f) else -2))
     if not headers.get("x-frame-options"):
         out.append(("X-Frame-Options", -2))
     if not headers.get("x-content-type-options"):
@@ -1048,7 +1092,7 @@ def domain_deductions(p: dict[str, Any]) -> list[tuple[str, int]]:
     elif len(takeover) >= 1:
         out.append(("Takeover potencial", -2))
     cookie_f = p.get("cookie_findings") or []
-    if any(f.get("severity") == "high" for f in cookie_f):
+    if any(severity.normalize(f.get("severity")) == "high" for f in cookie_f):
         out.append(("Cookies high", -3))
     elif cookie_f:
         out.append(("Cookies low", -1))
@@ -1376,7 +1420,7 @@ def build_findings(p: dict[str, Any]) -> list[dict[str, Any]]:
         for _cf in csp_f[:8]:
             _dir = (_cf.get("directive") or _cf.get("type") or "?").strip()
             _typ = (_cf.get("type") or "").strip()
-            _sev_raw = (_cf.get("severity") or "medium").lower()
+            _sev_raw = severity.normalize(_cf.get("severity") or "medium")
             _sev_map = {"high": "ALTA", "medium": "MEDIA", "low": "BAJA"}
             _sev = _sev_map.get(_sev_raw, "MEDIA")
             _is_enforced = bool(csp_enforced)
@@ -2326,7 +2370,7 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
     if csp_f:
         items = ""
         for f in csp_f[:10]:
-            icon = "&#10007;" if f.get("severity") == "high" else ("&#9888;" if f.get("severity") == "medium" else "&#9679;")
+            icon = "&#10007;" if severity.normalize(f.get("severity")) == "high" else ("&#9888;" if severity.normalize(f.get("severity")) == "medium" else "&#9679;")
             items += f"<li>{icon} [{str(f.get('severity', '')).upper()}] <strong>{esc(f.get('directive', ''))}</strong>: {esc(str(f.get('description', ''))[:140])}</li>"
         if len(csp_f) > 10:
             items += f"<li class='muted'>... y {len(csp_f) - 10} más</li>"
@@ -2336,7 +2380,7 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
     if ck_f:
         items = ""
         for f in ck_f[:10]:
-            icon = "&#10007;" if f.get("severity") == "high" else ("&#9888;" if f.get("severity") == "medium" else "&#9679;")
+            icon = "&#10007;" if severity.normalize(f.get("severity")) == "high" else ("&#9888;" if severity.normalize(f.get("severity")) == "medium" else "&#9679;")
             items += f"<li>{icon} [{str(f.get('severity', '')).upper()}] {esc(str(f.get('description', ''))[:160])}</li>"
         if len(ck_f) > 10:
             items += f"<li class='muted'>... y {len(ck_f) - 10} más</li>"
@@ -2614,20 +2658,48 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
     strix = p.get("strix") or {}
     if strix and strix.get("status") == "ok":
         fds = strix.get("findings") or []
+        by_sev = strix.get("by_severity") or {}
+        cost = strix.get("cost_usd") or 0
+        budget = (strix.get("guardrails") or {}).get("budget_usd")
         strix_meta = "Modo " + esc(str(strix.get("mode", "?"))) + " - " + str(len(fds)) + " hallazgo(s)"
-        if strix.get("cost_usd"):
-            strix_meta += " - costo LLM $" + str(strix.get("cost_usd"))
-        parts.append("<h4>Strix AI Pentest</h4><p class='meta'>" + strix_meta + "</p>")
+        if strix.get("cvss_max"):
+            strix_meta += " - CVSS max " + str(strix.get("cvss_max"))
+        if cost:
+            strix_meta += " - costo LLM $" + str(cost)
+            if budget is not None:
+                strix_meta += " (tope $" + str(budget) + ")"
+        if by_sev:
+            chips = " ".join(str(by_sev[k]) + " " + k for k in ("critical", "high", "medium", "low", "info") if by_sev.get(k))
+            if chips:
+                strix_meta += " - " + chips
+        if strix.get("run_status"):
+            strix_meta += " - estado " + esc(str(strix.get("run_status")))
+        block = "<h4>Strix AI Pentest</h4><p class='meta'>" + strix_meta + "</p>"
+        if (strix.get("guardrails") or {}).get("over_budget"):
+            block += "<p class='meta'><span class='err'>Presupuesto LLM excedido (OWASP LLM10)</span></p>"
+        if strix.get("instruction"):
+            block += "<p class='meta'>Instruccion: " + esc(str(strix.get("instruction"))[:160]) + "</p>"
         if fds:
             items = ""
-            for f in sorted(fds, key=lambda x: str(x.get("severity", "")).lower() in ("critical", "critica", "high", "alta"), reverse=True)[:8]:
+            for f in sorted(fds, key=lambda x: severity.normalize(x.get("severity", "")) in ("critical", "high"), reverse=True)[:8]:
                 sev = esc(str(f.get("severity", "?")))
                 title = esc(str(f.get("title", "?"))[:100])
                 cve = esc(str(f.get("cve", "-")))
                 cvss = esc(str(f.get("cvss", "-")))
                 rem = esc(str(f.get("remediation_steps", f.get("remediation", "")))[:160])
-                items += "<li><b>[" + sev + "]</b> <strong>" + title + "</strong> - " + cve + " - CVSS " + cvss + "<br/><span class='muted'>" + rem + "</span></li>"
-            parts.append("<ul class='compact'>" + items + "</ul>")
+                meta_bits = [cve, "CVSS " + cvss]
+                if f.get("endpoint"):
+                    meta_bits.append(esc(str(f.get("endpoint"))[:80]))
+                if f.get("confidence"):
+                    meta_bits.append("conf " + esc(str(f.get("confidence"))))
+                if f.get("fix_effort"):
+                    meta_bits.append("esfuerzo " + esc(str(f.get("fix_effort"))))
+                badges = (_oasm.render_finding_badges(f, domain=p.get("domain")) if _oasm else "")
+                items += "<li><b>[" + sev + "]</b> <strong>" + title + "</strong> - " + " - ".join(meta_bits) + ((" " + badges) if badges else "") + "<br/><span class='muted'>" + rem + "</span></li>"
+            block += "<ul class='compact'>" + items + "</ul>"
+        if strix.get("sarif_results"):
+            block += "<p class='meta'>Hallazgos exportables SARIF: " + str(strix.get("sarif_results")) + "</p>"
+        parts.append(block)
 
     fr = p.get("finalrecon") or {}
     if fr:
@@ -2666,6 +2738,23 @@ def gc_provider_detail(p: dict[str, Any], matrix: list | None = None) -> str:
         if not oitems:
             oitems = '<li class="muted">Sin hallazgos que afecten compliance.</li>'
         parts.append(f"<h4>OWASP Agentic Top 10 -- Grado: {esc(str(grade))} ({pct}%)</h4><ul class='compact'>{oitems}</ul>")
+
+    ow_web = None
+    for m in (matrix or []):
+        if isinstance(m, dict) and m.get("dominio") == dom and m.get("owasp_web"):
+            ow_web = m.get("owasp_web")
+            break
+    if ow_web and not ow_web.get("error") and str(ow_web.get("overall_grade", "?")).strip() not in ("?", "", "-", "N/A"):
+        wgrade = ow_web.get("overall_grade", "--")
+        wpct = ow_web.get("overall_compliance", 0)
+        witems = ""
+        for r_id, r_data in sorted((ow_web.get("risks") or {}).items()):
+            if isinstance(r_data, dict) and r_data.get("finding_count", 0) > 0:
+                icon = "&#10007;" if r_data.get("compliance_pct", 100) < 60 else "&#10003;"
+                witems += f"<li>{icon} <strong>{esc(r_id)}</strong>: Grado {esc(str(r_data.get('grade', '?')))} ({r_data.get('compliance_pct', '?')}%) -- {r_data.get('finding_count', 0)} hallazgo(s)</li>"
+        if not witems:
+            witems = '<li class="muted">Sin hallazgos que afecten compliance.</li>'
+        parts.append(f"<h4>OWASP Web Top 10 (2025) -- Grado: {esc(str(wgrade))} ({wpct}%)</h4><ul class='compact'>{witems}</ul>")
 
     social = p.get("social") or {}
     if social:
@@ -2785,6 +2874,41 @@ def _logo_gc_b64() -> str:
         raw = (ROOT / "logo-grupo-cibest-negativo.png").read_bytes()
         import base64
         return base64.b64encode(raw).decode("ascii")
+    except Exception:
+        return ""
+
+
+def _oasm_section_b5(p0: dict[str, Any], dom0: str, overall: Any,
+                     all_findings: list[dict[str, Any]], hist: Any) -> str:
+    if _oasm is None:
+        return ""
+    try:
+        counts = _oasm.counts_from_findings(all_findings, key="severidad")
+        assets = _oasm.asset_count(p0)
+        cur = {"overall_score": overall}
+        prev = _oasm.previous_snapshot(dom0)
+        trend_hist = _oasm.load_history(dom0, 90, "overall_score") or hist or []
+        return (
+            _oasm.render_score_header(counts, assets, "Security Score 0-10 (modelo OASM)")
+            + _oasm.render_comparison_block(dom0, cur, prev)
+            + _oasm.render_trend_block(trend_hist, "Tendencia del Score (90 dias)")
+            + _oasm.render_lifecycle_block(dom0, all_findings)
+            + (_eeasm.render_asset_change_block(dom0, p0) if _eeasm is not None else "")
+            + (_eeasm.render_permutation_block(dom0, p0) if _eeasm is not None else "")
+            + (_sc.render_provider_scorecard_block(dom0, p0) if _sc is not None else "")
+            + (_sc.render_toolchain_scorecard_block() if _sc is not None else "")
+            + (_hotlist.render_hotlist_block(dom0, p0) if _hotlist is not None else "")
+            + (_origin.render_origin_block(dom0, p0) if _origin is not None else "")
+            + (_dnsx.render_dns_extra_block(dom0, p0) if _dnsx is not None else "")
+            + (_xen.render_fusion_block(dom0, p0) if _xen is not None else "")
+            + (_xen.render_ctem_block(dom0, p0) if _xen is not None else "")
+            + (_xen.render_insurance_block(dom0, p0) if _xen is not None else "")
+            + (_xen.render_pqc_block(dom0, p0) if _xen is not None else "")
+            + (_xen.render_ransomware_block(dom0, p0) if _xen is not None else "")
+            + (_rng.render_gf_block(dom0, p0) if _rng is not None else "")
+            + (_rng.render_interesting_block(dom0, p0) if _rng is not None else "")
+            + (_rng.render_webports_block(dom0, p0) if _rng is not None else "")
+        )
     except Exception:
         return ""
 
@@ -3260,12 +3384,32 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
     if not precia_blocks:
         precia_blocks = "<div class='info-box'>Scorecard no disponible para los datos actuales.</div>"
 
+
+    # Generate B5 Scorecard panel for the first provider
+    b5_scorecard = b""
+    if _b5_sc_exact is not None and providers:
+        try:
+            _pf = [f for f in all_findings if f.get(b"dominio") == providers[0].get(b"domain", b"")]
+            try:
+                _pprev = prev_factor_scores(providers[0].get(b"domain", b"")) or None
+            except Exception:
+                _pprev = None
+            _full = _b5_sc_exact(providers[0], analista=analista_show or b"@eduingt",
+                                     org=providers[0].get(b"name") or providers[0].get(b"domain", b""),
+                                     generated=gen, findings=_pf, prev_scores=_pprev)
+            _cut = b'<div style="margin:0 16px 12px; background:#fff; border:1px solid #D9DEE3; border-radius:8px; padding:10px; page-break-before:always;">'
+            if _cut in _full:
+                _full = _full.split(_cut)[0].rstrip() + b"</section>"
+            b5_scorecard = _full
+        except Exception:
+            b5_scorecard = b""
+
     # Detalle hallazgos cards
     cards = ""
     for f in all_findings:
         cards += f"""
         <div class="find-card" id="hallazgo-{esc(str(f.get('num', '?')))}">
-          <div class="fc-hdr"><span style="font-weight:800; color:#173B57;">#{f.get('num', '?')} {esc(f.get('id',''))}</span><span class="s-badge {_bcls(f['severidad'])}">{esc(_DISP_SEV.get(f['severidad'], f['severidad']))}</span><span style="font-weight:700; color:#173B57;">{esc(_DISP_CAT.get(f['categoria'], f['categoria']))}</span><span style="flex:1;">{esc(f['dominio'])}</span></div>
+          <div class="fc-hdr"><span style="font-weight:800; color:#173B57;">#{f.get('num', '?')} {esc(f.get('id',''))}</span><span class="s-badge {_bcls(f['severidad'])}">{esc(_DISP_SEV.get(f['severidad'], f['severidad']))}</span><span style="font-weight:700; color:#173B57;">{esc(_DISP_CAT.get(f['categoria'], f['categoria']))}</span><span style="flex:1;">{esc(f['dominio'])}</span>{_oasm.render_lifecycle_badge(f, domain=f['dominio']) if _oasm else ''}</div>
           <div class="fc-body">
             <div class="fc-row"><div class="fc-label">Título</div><div class="fc-value"><strong>{esc(f['titulo'])}</strong></div></div>
             <div class="fc-row"><div class="fc-label">Explicación</div><div class="fc-value">{esc(f['explicacion'])}</div></div>
@@ -3333,6 +3477,7 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
 <div class="toc-row"><span class="toc-num">4</span><a class="toc-title" href="#sec-score">Factor Score / Puntuación General</a><span class="toc-pg" data-pg="sec-score">–</span></div>
 <div class="toc-row toc-sub"><span class="toc-num">4.1</span><a class="toc-title" href="#sec-factores">Factores de Riesgo</a><span class="toc-pg" data-pg="sec-factores">–</span></div>
 <div class="toc-row toc-sub"><span class="toc-num">4.2</span><a class="toc-title" href="#sec-historial">Historial del Score</a><span class="toc-pg" data-pg="sec-historial">–</span></div>
+<div class="toc-row toc-sub"><span class="toc-num">4.3</span><a class="toc-title" href="#sec-oasm">Enriquecimiento OASM (Score 0-10)</a><span class="toc-pg" data-pg="sec-oasm">–</span></div>
 <div class="toc-row"><span class="toc-num">5</span><a class="toc-title" href="#sec-domain">Domain Score (Tecnico)</a><span class="toc-pg" data-pg="sec-domain">–</span></div>
 <div class="toc-row"><span class="toc-num">6</span><a class="toc-title" href="#sec-pasivo">Análisis Pasivo / Activo</a><span class="toc-pg" data-pg="sec-pasivo">–</span></div>
 <div class="toc-row toc-sub"><span class="toc-num">6.1</span><a class="toc-title" href="#sec-inventario">Inventario de Activos</a><span class="toc-pg" data-pg="sec-inventario">–</span></div>
@@ -3431,6 +3576,8 @@ def build_report(asm: dict[str, Any], analista: str = "", org: str = "GrupoCibes
 <div style="background:#fff; border:1px solid #D9DEE3; border-left:4px solid #2F6F9F; border-radius:6px; padding:12px 14px; margin:12px 0; font-size:9pt; color:#374151; line-height:1.65;"><strong>¿Cómo se calcula?</strong> Cada factor empieza en <strong>100</strong> y pierde puntos por cada incidencia (proveedor que falla una verificación). {esc(calc_example)} Validado: <strong>100</strong> = 0 incidencias (todo ok). Colores: <span style="color:#2E7D32;">■</span> ≥90 verde, <span style="color:#F9A825;">■</span> 70-89 amarillo, <span style="color:#EF6C00;">■</span> 60-69 naranja, <span style="color:#C62828;">■</span> &lt;60 rojo. Fórmula {esc(FORMULA_VERSION)} ({esc(FORMULA_DATE)}).<br>Domain Score {dscore}/100 (higiene técnica) | Overall Score {overall}/100 (benchmark sectorial, ver sección 3 y Anexo F).</div>
 <div class="section-sub" id="sec-historial">4.2 Historial del Score (30 días)</div>
 {hist_html}
+<div class="section-sub" id="sec-oasm">4.3 Enriquecimiento OASM (Score 0-10, comparativa y tendencia)</div>
+{_oasm_section_b5(p0, dom0, overall, all_findings, history)}
 </div>
 
 <div class="sec" id="sec-domain"><div class="section-title" style="border-top:3px solid #173B57; padding-top:10px;">5. Domain Score (Tecnico)</div>

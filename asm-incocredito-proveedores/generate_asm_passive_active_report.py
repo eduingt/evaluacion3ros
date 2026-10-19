@@ -1262,6 +1262,31 @@ def build_report(asm: dict[str, Any], title: str, subtitle: str, version: str) -
         </div>
         <div class="owasp-grid">{items}</div>"""
 
+    owasp_web_data = first_m.get("owasp_web") if matrix_by_domain else None
+    if owasp_web_data:
+        wrisks = owasp_web_data.get("risks", {})
+        wcomply = owasp_web_data.get("overall_compliance", 0)
+        wgrade = owasp_web_data.get("overall_grade", "?")
+        wcolor = grade_color(wgrade)
+        witems = ""
+        for rid in ("W-01", "W-02", "W-03", "W-04", "W-05", "W-06", "W-07", "W-08", "W-09", "W-10"):
+            r = wrisks.get(rid, {})
+            cpct = r.get("compliance_pct", 0)
+            rc = grade_color(grade_letter(cpct))
+            witems += f"""<div class="owasp-item">
+              <div class="oid">{rid}</div>
+              <div class="otitle">{esc(r.get('title',''))}</div>
+              <div class="owasp-bar"><div class="owasp-fill" style="width:{cpct}%;background:{rc}"></div></div>
+              <div class="owasp-pct">{cpct:.0f}% compliance</div>
+            </div>"""
+        owasp_html += f"""<div class="sec-title">OWASP Web Top 10 (2025)</div>
+        <div class="grade-row">
+          <div class="grade-letter" style="color:{wcolor}">{esc(wgrade)}</div>
+          <div><div class="grade-bar"><div class="grade-fill" style="width:{wcomply}%;background:{wcolor}"></div></div></div>
+          <div class="grade-desc">{wcomply:.1f}% compliance general</div>
+        </div>
+        <div class="owasp-grid">{witems}</div>"""
+
     # Provider cards
     prov_cards = ""
     for ps in prov_summaries:

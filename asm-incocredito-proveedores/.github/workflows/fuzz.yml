@@ -1,0 +1,36 @@
+name: fuzz
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "generate_dast_config.py"
+      - "fuzz/**"
+  schedule:
+    - cron: "0 10 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  atheris:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Atheris
+        run: pip install atheris
+      - name: Fuzz DAST parsers (PR smoke 120s)
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        run: |
+          cp asm_report.json fuzz/corpus/real.json
+          python fuzz/fuzz_dast.py -max_total_time=120 fuzz/corpus/
+      - name: Fuzz DAST parsers (weekly 600s)
+        if: github.event_name == 'schedule'
+        run: |
+          cp asm_report.json fuzz/corpus/real.json
+          python fuzz/fuzz_dast.py -max_total_time=600 fuzz/corpus/

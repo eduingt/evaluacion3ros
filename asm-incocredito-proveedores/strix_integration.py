@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import llm_guardrails
+
 STRIX_MODES = {1: None, 2: "quick", 3: "standard", 4: "deep"}
 STRIX_RUN_DIR = Path("strix_runs")
 
@@ -39,11 +41,50 @@ def _check_environment() -> list[str]:
     return missing
 
 
-def _latest_run_dir() -> Path | None:
-    if not STRIX_RUN_DIR.is_dir():
+def _runs_base(workdir: str | None = None) -> Path:
+    base = Path(workdir) if workdir else Path.cwd()
+    return base / STRIX_RUN_DIR
+
+
+def _latest_run_dir(workdir: str | None = None) -> Path | None:
+    """Directorio de run mas reciente.
+
+    Strix nombra los runs ``strix_runs/<run-name>`` (no necesariamente ``run-*``);
+    la deteccion real es cualquier subcarpeta con ``run.json``, ordenada por el
+    mtime de ese archivo (Strix lo reescribe en cada cambio de estado)."""
+    base = _runs_base(workdir)
+    if not base.is_dir():
         return None
-    runs = sorted(STRIX_RUN_DIR.glob("run-*"), key=lambda p: p.stat().st_mtime, reverse=True)
-    return runs[0] if runs else None
+    candidates = [c for c in base.iterdir() if (c / "run.json").is_file()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda c: (c / "run.json").stat().st_mtime)
+
+
+def _count_sarif_results(run_dir: Path) -> int:
+    """Cuenta resultados en ``findings.sarif`` (SARIF 2.1.0) si Strix lo genero."""
+    path = run_dir / "findings.sarif"
+    if not path.exists():
+        return 0
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    return sum(len(r.get("results") or []) for r in (data.get("runs") or []) if isinstance(r, dict))
+
+
+def _severity_breakdown(findings: list[dict[str, Any]]) -> tuple[dict[str, int], float]:
+    by_sev: dict[str, int] = {}
+    cvss_max = 0.0
+    for f in findings:
+        sev = (f.get("severity") or "info").lower()
+        by_sev[sev] = by_sev.get(sev, 0) + 1
+        try:
+            cvss = float(f.get("cvss") or 0)
+        except (TypeError, ValueError):
+            cvss = 0.0
+        cvss_max = max(cvss_max, cvss)
+    return by_sev, cvss_max
 
 
 def _parse_vulnerabilities(run_dir: Path) -> list[dict[str, Any]]:
@@ -80,16 +121,7 @@ def summarize_strix(strix: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(strix, dict) or strix.get("status") != "ok":
         return {"status": strix.get("status", "missing")}
     findings = strix.get("findings") or []
-    by_sev: dict[str, int] = {}
-    cvss_max = 0.0
-    for f in findings:
-        sev = (f.get("severity") or "info").lower()
-        by_sev[sev] = by_sev.get(sev, 0) + 1
-        try:
-            cvss = float(f.get("cvss") or 0)
-        except (TypeError, ValueError):
-            cvss = 0.0
-        cvss_max = max(cvss_max, cvss)
+    by_sev, cvss_max = _severity_breakdown(findings)
     return {
         "status": "ok",
         "count": len(findings),
@@ -97,7 +129,7 @@ def summarize_strix(strix: dict[str, Any]) -> dict[str, Any]:
         "cvss_max": cvss_max,
         "top_cve": [f.get("cve") for f in findings[:5] if f.get("cve")],
         "top_cwe": [f.get("cwe") for f in findings[:5] if f.get("cwe")],
-        "llm_cost_usd": (strix.get("run_record") or {}).get("llm_usage", {}).get("total_cost_usd", 0),
+        "llm_cost_usd": strix.get("cost_usd") or llm_guardrails.cost_usd(strix),
     }
 
 
@@ -114,8 +146,10 @@ def run_strix(domain: str, test_level: int = 3, workdir: str | None = None) -> d
         return {**base, "status": "skipped", "missing": missing, "mode": mode,
                 "reason": "strix no ejecutable en este entorno: " + " | ".join(missing)}
 
-    run_dir_before = _latest_run_dir()
-    cmd = ["strix", "-n", "--target", f"https://{domain}", "--scan-mode", mode]
+    budget = llm_guardrails.budget_usd()  # LLM10: tope de consumo por escaneo
+    run_dir_before = _latest_run_dir(workdir)
+    cmd = ["strix", "-n", "--target", f"https://{domain}", "--scan-mode", mode,
+           "--max-budget", str(budget)]
     env = dict(os.environ)
     env.setdefault("STRIX_TELEMETRY", "0")
     try:
@@ -126,28 +160,42 @@ def run_strix(domain: str, test_level: int = 3, workdir: str | None = None) -> d
     except OSError as exc:
         return {**base, "status": "error", "mode": mode, "error": f"no se pudo lanzar strix: {exc}"}
 
-    run_dir = _latest_run_dir()
+    run_dir = _latest_run_dir(workdir)
     if run_dir is not None and run_dir != run_dir_before:
         findings = _parse_vulnerabilities(run_dir)
         run_record = _parse_run_record(run_dir)
-        scan_results = run_record.get("scan_results") or {}
-        return {
+        by_sev, cvss_max = _severity_breakdown(findings)
+        result = {
             **base,
             "status": "ok",
             "mode": mode,
             "exit_code": proc.returncode,
+            # Strix: 0 = limpio, 1 = error fatal, 2 = vulnerabilidades encontradas.
+            "findings_found": bool(findings) or proc.returncode == 2,
+            "run_status": run_record.get("status"),
+            "started_at": run_record.get("start_time"),
+            "ended_at": run_record.get("end_time"),
+            "targets": [t.get("original") for t in (run_record.get("targets_info") or [])
+                        if isinstance(t, dict) and t.get("original")],
+            "instruction": run_record.get("user_instruction") or run_record.get("instruction"),
             "findings": findings,
+            "findings_count": len(findings),
+            "by_severity": by_sev,
+            "cvss_max": cvss_max,
+            "cost_usd": llm_guardrails.cost_usd({"run_record": run_record}),
+            "sarif_results": _count_sarif_results(run_dir),
             "run_record": run_record,
-            "scan_results": scan_results,
             "run_dir": str(run_dir),
-            "stdout_truncated": (proc.stdout or "")[-1500:],
-            "stderr_truncated": (proc.stderr or "")[-1000:],
+            "stdout_truncated": llm_guardrails.redact((proc.stdout or "")[-1500:]),
+            "stderr_truncated": llm_guardrails.redact((proc.stderr or "")[-1000:]),
         }
+        result["guardrails"] = llm_guardrails.assess(result)
+        return result
 
     return {**base, "status": "error", "mode": mode, "exit_code": proc.returncode,
-            "error": "strix termino sin generar run_dir (revisa stdout)",
-            "stdout_truncated": (proc.stdout or "")[-1500:],
-            "stderr_truncated": (proc.stderr or "")[-1000:]}
+            "error": llm_guardrails.redact("strix termino sin generar run_dir (revisa stdout)"),
+            "stdout_truncated": llm_guardrails.redact((proc.stdout or "")[-1500:]),
+            "stderr_truncated": llm_guardrails.redact((proc.stderr or "")[-1000:])}
 
 
 def _top_findings(strix: dict[str, Any], limit: int = 5) -> list[dict[str, Any]]:

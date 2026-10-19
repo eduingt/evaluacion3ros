@@ -13,18 +13,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import severity
+
 ROOT = Path(__file__).resolve().parent
 
 SARIF_VERSION = "2.1.0"
 SARIF_SCHEMA = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
-
-SEVERITY_MAP = {
-    "critical": "error",
-    "high": "error",
-    "medium": "warning",
-    "low": "note",
-    "info": "note",
-}
 
 
 def _cve_to_result(cve: dict[str, Any], domain: str, run_id: int) -> dict[str, Any]:
@@ -76,8 +70,8 @@ def _cve_to_result(cve: dict[str, Any], domain: str, run_id: int) -> dict[str, A
 
 def _issue_to_result(issue: dict[str, Any], domain: str, rule_prefix: str) -> dict[str, Any] | None:
     desc = issue.get("desc", issue.get("description", ""))
-    sev = issue.get("level", issue.get("gravedad", "medium")).lower()
-    level = SEVERITY_MAP.get(sev, "warning")
+    sev = issue.get("level", issue.get("gravedad", "medium"))
+    level = severity.sarif_level(sev)
 
     return {
         "ruleId": f"{rule_prefix}/{issue.get('id', 'unknown')}",

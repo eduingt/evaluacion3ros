@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "supply-chain-security": {
+      "source": "microsoft/hve-core",
+      "sourceType": "github",
+      "skillPath": ".github/skills/security/supply-chain-security/SKILL.md",
+      "computedHash": "b21b528a010120cb20c6fc25db84e0852cfb20811aeda83950c8a02b12b1d30c"
+    }
+  }
+}

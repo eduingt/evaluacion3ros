@@ -1,0 +1,27 @@
+name: dependency-pinning
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "requirements*.txt"
+      - ".github/workflows/**"
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify requirements are pinned
+        shell: pwsh
+        run: |
+          $bad = Get-Content requirements.txt, requirements-dashboard.txt |
+            Where-Object { $_ -notmatch '^\s*(#|$)' -and $_ -notmatch '==' }
+          if ($bad) { Write-Error "Lineas sin pin == : $($bad -join ', ')"; exit 1 }
+          Write-Output "requirements pineados OK"

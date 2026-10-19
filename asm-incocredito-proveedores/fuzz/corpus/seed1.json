@@ -1,0 +1,1 @@
+{"providers": [{"domain": "www.incocredito.com.co", "name": "Incocredito (www)", "api_endpoints": [{"path": "/api/v1/health", "status_code": 200, "method": "GET", "category": "health", "is_shadow": false}], "cve_findings": [{"id": "CVE-2024-0001", "risk_score": 7.5, "epss_score": 0.12, "in_kev": false}]}]}

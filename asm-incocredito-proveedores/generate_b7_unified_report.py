@@ -9,7 +9,7 @@ forense por hallazgo (DOMINIO|URL|SHA-256|SERIAL|EVIDENCIA + fecha de ultima
 observacion) y nota legal.
 
 Scoring propio (no es calificacion oficial SSC): reutiliza precia_scorecard
-(factor_scores 0-100 + overall ponderado) y anade IMPACT_MAP decimal por regla
+(factor_scores 0-100 + overall promedio simple v3.0) y anade IMPACT_MAP decimal por regla
 para la columna IMPACTO EN EL SCORE. Datos 100% reales desde asm_report.json;
 sin datos observados -> modulo limpio ("No se encontro ningun problema"); solo datos del escaneo.
 """
@@ -24,8 +24,49 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-FORMULA_VERSION = "B7-v1.0"
-FORMULA_DATE = "2026-10-06"
+try:
+    import oasm_enrich as _oasm
+except Exception:
+    _oasm = None
+
+try:
+    import easyeasm_enrich as _eeasm
+except Exception:
+    _eeasm = None
+
+try:
+    import scorecard_enrich as _sc
+except Exception:
+    _sc = None
+
+try:
+    import origin_ip as _origin
+except Exception:
+    _origin = None
+
+try:
+    import dns_extra as _dnsx
+except Exception:
+    _dnsx = None
+
+try:
+    import hotlist as _hotlist
+except Exception:
+    _hotlist = None
+
+try:
+    import xorcism_enrich as _xen
+except Exception:
+    _xen = None
+
+try:
+    import rengine_enrich as _rng
+except Exception:
+    _rng = None
+
+FORMULA_VERSION = "B7-v2.0"
+
+FORMULA_DATE = "2026-10-11"
 
 ROOT = Path(__file__).resolve().parent
 
@@ -41,39 +82,44 @@ except Exception:
     _PRECIA_FACTORS, _INDUSTRY_AVG = [], {}
     _precia_scores = _precia_overall = _precia_industry = None  # type: ignore
 
+try:
+    from toc_helper import render_toc as _render_toc
+except Exception:
+    _render_toc = None  # type: ignore
+
 SSC_FACTORS = [
-    ("appsec", "SEGURIDAD DE APLICACION WEB",
+    ("appsec", "SEGURIDAD DE APLICACIÓN WEB",
      "Utiliza inteligencia de amenazas sobre vulnerabilidades conocidas: CVE whitehat, "
      "exploits blackhat y hallazgos indexados por buscadores. Mide la probabilidad de una "
-     "filtracion en la aplicacion web y detecta defacements, versiones obsoletas y cabeceras inseguras."),
+     "filtración en la aplicación web y detecta defacements, versiones obsoletas y cabeceras inseguras."),
     ("cubit", "CUBIT SCORE",
-     "Modulo de higiene que verifica buenas practicas basicas: HSTS, CSP, XFO, SPF, DMARC, "
-     "DNSSEC, CAA, MTA-STS y TLS vigente. Mide la disciplina de configuracion de la empresa."),
+     "Módulo de higiene que verifica buenas prácticas básicas: HSTS, CSP, XFO, SPF, DMARC, "
+     "DNSSEC, CAA, MTA-STS y TLS vigente. Mide la disciplina de configuración de la empresa."),
     ("dns", "ESTADO DE DNS",
-     "Mide el estado y la configuracion del DNS: registros SPF/DMARC/DKIM, DNSSEC, CAA y "
-     "ausencia de eventos maliciosos en el historial pasivo. Verifica la proteccion anti-spoofing del correo."),
-    ("endpoint", "SEGURIDAD DE PUNTOS DE CONEXION",
+     "Mide el estado y la configuración del DNS: registros SPF/DMARC/DKIM, DNSSEC, CAA y "
+     "ausencia de eventos maliciosos en el historial pasivo. Verifica la protección anti-spoofing del correo."),
+    ("endpoint", "SEGURIDAD DE PUNTOS DE CONEXIÓN",
      "Rastrea subdominios y puntos de entrada (takeovers, brute force, certificados) para "
      "identificar versiones obsoletas o exposiciones que permitan ataques del lado del cliente."),
     ("chatter", "HACKER CHATTER",
-     "Sistema de recoleccion de menciones en foros, IRC, redes y repositorios publicos. "
+     "Sistema de recolección de menciones en foros, IRC, redes y repositorios públicos. "
      "Clasifica indicadores (ransomware, CTI) que mencionen a la empresa o sus dominios."),
-    ("iprep", "REPUTACION DE IP",
-     "Cruza las IPs de la empresa con DNSBL, URLhaus y reputacion de red. La cantidad y "
-     "duracion de listados determina el indicador clave de amenaza del modulo."),
-    ("leak", "FILTRACION DE INFORMACION",
+    ("iprep", "REPUTACIÓN DE IP",
+     "Cruza las IPs de la empresa con DNSBL, URLhaus y reputación de red. La cantidad y "
+     "duración de listados determina el indicador clave de amenaza del módulo."),
+    ("leak", "FILTRACIÓN DE INFORMACIÓN",
      "Usa leaks observados y breach intel para identificar credenciales comprometidas en "
-     "circulacion: filtraciones masivas publicas e intercambios entre atacantes."),
+     "circulación: filtraciones masivas públicas e intercambios entre atacantes."),
     ("network", "SEGURIDAD DE RED",
      "Comprueba puertos abiertos de alto riesgo, servicios inseguros (FTP/RDP/DNS/proxy), "
-     "TLS debil y certificados invalidos. Un puerto mal configurado es la puerta entre el "
+     "TLS débil y certificados inválidos. Un puerto mal configurado es la puerta entre el "
      "atacante y la red interna."),
-    ("patching", "CADENCIA DE APLICACION DE REVISIONES",
-     "Analiza la rapidez de reaccion ante vulnerabilidades: CVEs observados en servicios, "
-     "tecnologias EOL y comparacion contra el ritmo de parcheo esperado."),
-    ("social", "INGENIERIA SOCIAL",
-     "Mide la susceptibilidad a ingenieria social dirigida mediante typosquatting "
-     "registrado contra la marca y exposicion en redes y filtraciones publicas."),
+    ("patching", "CADENCIA DE APLICACIÓN DE REVISIONES",
+     "Analiza la rapidez de reacción ante vulnerabilidades: CVEs observados en servicios, "
+     "tecnologías EOL y comparación contra el ritmo de parcheo esperado."),
+    ("social", "INGENIERÍA SOCIAL",
+     "Mide la susceptibilidad a ingeniería social dirigida mediante typosquatting "
+     "registrado contra la marca y exposición en redes y filtraciones públicas."),
 ]
 
 GRADE_COLORS = {"A": "#34A853", "B": "#F29900", "C": "#F06030", "D": "#E53935", "F": "#B71C1C"}
@@ -147,7 +193,7 @@ CSS = """
   size: A4;
   margin: 18mm 14mm 20mm 14mm;
   @top-left {
-    content: "Grupo Cibest   con la tecnologia de SecurityScorecard";
+    content: "Grupo Cibest   con la tecnología de SecurityScorecard";
     font-family: Arial, Helvetica, sans-serif; font-size: 7pt; color: #6B7280;
   }
   @top-right {
@@ -155,7 +201,7 @@ CSS = """
     font-family: Arial, Helvetica, sans-serif; font-size: 7pt; color: #111827;
   }
   @bottom-center {
-    content: "Analisis de opinion sobre riesgos futuros de seguridad relativos a la fecha indicada; no constituye pentest ni evaluacion final. Uso interno confidencial. (c) 2026 GrupoCibest. Formula " var(--ssc-formula) ".";
+    content: "Análisis de opinión sobre riesgos futuros de seguridad relativos a la fecha indicada; no constituye pentest ni evaluación final. Uso interno confidencial. (c) 2026 GrupoCibest. Fórmula " var(--ssc-formula) ".";
     font-family: Arial, Helvetica, sans-serif; font-size: 5pt; color: #9AA0A6;
     white-space: normal; text-align: center;
   }
@@ -163,16 +209,17 @@ CSS = """
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, Helvetica, sans-serif; color: #111827; background: #fff;
        font-size: 10pt; line-height: 1.55; }
-.cover { page-break-after: always; padding-top: 10mm; }
-.brand-row { display: flex; align-items: center; gap: 18px; margin-bottom: 26mm; }
-.brand-box { background: #1A1A1A; color: #fff; font-weight: 800; font-size: 26pt;
-              padding: 18px 34px; line-height: 1.1; }
-.brand-sub { font-size: 11pt; color: #6B7280; }
-.brand-sub b { color: #111827; }
-.kicker { font-size: 11pt; font-weight: 700; letter-spacing: .04em; margin-bottom: 6px; }
-h1.title { font-size: 34pt; font-weight: 400; line-height: 1.15; margin-bottom: 4px; }
-h1.title .accent { color: #2B5CE6; }
-.genline { font-size: 10pt; color: #111827; margin-top: 10px; }
+.cover { page-break-after:always; padding:0; position:relative; display:flex; flex-direction:column; min-height:95vh; }
+.cover-top { background:#173B67; color:#fff; padding:50px 60px 30px; }
+.cover-top .powered { font-size:8pt; opacity:.7; letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px; }
+.cover-top h1 { font-size:30pt; font-weight:800; line-height:1.1; margin-bottom:4px; }
+.cover-top .sub { font-size:13pt; font-weight:300; color:rgba(255,255,255,.85); margin-bottom:30px; line-height:1.3; }
+.cover-top .org-name { font-size:20pt; font-weight:700; color:#fff; }
+.cover-meta { padding:30px 60px 20px; flex:1; }
+.cover-meta table { width:100%; border-collapse:collapse; font-size:10pt; }
+.cover-meta td { padding:7px 12px; border-bottom:1px solid #D9DEE3; }
+.cover-meta td:first-child { font-weight:700; color:#173B67; width:200px; }
+.cover-footer { border-top:3px solid #173B67; padding:12px 60px 0; font-size:7pt; color:#6B7280; display:flex; justify-content:space-between; }
 h2.sec { font-size: 22pt; font-weight: 700; margin: 0 0 12px; }
 h3.mod { font-size: 17pt; font-weight: 400; margin: 0; text-transform: uppercase; letter-spacing: .01em; }
 .mod-head { display: flex; align-items: center; gap: 12px; margin: 8mm 0 5mm; }
@@ -241,27 +288,42 @@ def ssc_css_vars(domain: str, fecha_corta: str) -> str:
     )
 
 
+def _logo_gc_b64() -> str:
+    """Logo Grupo Cibest (version negativa/blanca) en base64 para la portada."""
+    try:
+        raw = (ROOT / "logo-grupo-cibest-negativo.png").read_bytes()
+        import base64
+        return base64.b64encode(raw).decode("ascii")
+    except Exception:
+        return ""
+
+
 def render_cover(company: str, domain: str, fecha_corta: str, fecha_larga: str,
-                 analista: str, email: str, org: str, utc_stamp: str) -> str:
-    by = f"por {esc(analista)}" + (f" ({esc(email)})" if email else "") + f", {esc(org)}"
+                 analista: str, email: str, org: str, utc_stamp: str,
+                 overall: int, letter: str, sector: str, incidences: int) -> str:
+    _l64 = _logo_gc_b64()
+    logo_img = (f"<div style='margin-bottom:14px; text-align:left;'><img src='data:image/png;base64,{_l64}' "
+                f"style='height:46px;' alt='Grupo Cibest'></div>" if _l64 else "")
     return f"""
 <div class="cover">
-  <div class="brand-row">
-    <div class="brand-box">Grupo<br>Cibest</div>
-    <div class="brand-sub">con la tecnologia<br>de <b>SecurityScorecard</b> (homologado)</div>
+  <div class="cover-top">
+    {logo_img}
+    <div class="powered">Generado por GrupoCibest</div>
+    <h1>INFORME DETALLADO DE<br>SEGURIDAD</h1>
+    <div class="sub">Evaluación de postura de seguridad<br>estilo Scorecard (homologado SSC)</div>
+    <div class="org-name">{esc(domain)}</div>
   </div>
-  <div class="kicker">INFORME DETALLADO</div>
-  <h1 class="title">Scorecard para<br><span class="accent">{esc(company)}</span></h1>
-  <div class="genline">Generado {esc(fecha_larga)}<br>{by}</div>
-  <div style="margin-top: 22mm;">
-    <p><b>Acerca de este informe</b><br>
-    Este informe es una captura puntual de este Scorecard desde {esc(utc_stamp)}. No
-    debe confundirse con un resultado de prueba de penetracion ni con una evaluacion final.
-    Formula {FORMULA_VERSION} con datos observados del escaneo ASM.</p>
-    <p style="margin-top:4mm;"><b>Obtenga una vision global con el monitoreo continuo</b><br>
-    Este documento resume 10 factores de riesgo, elementos de accion priorizados por impacto
-    y evidencia forense por hallazgo con fecha de ultima observacion.</p>
-  </div>
+  <div class="cover-meta"><table>
+    <tr><td>Fecha de generación</td><td>{esc(fecha_larga)}</td></tr>
+    <tr><td>Analista responsable</td><td>{esc(analista) if analista else "—"}</td></tr>
+    <tr><td>Organización emisora</td><td>{esc(org)}</td></tr>
+    <tr><td>Dominio evaluado</td><td>{esc(domain)}</td></tr>
+    <tr><td>Sector</td><td>{esc(sector)}</td></tr>
+    <tr><td><strong>OVERALL SCORE</strong></td><td><strong>{overall}/100 ({esc(letter)})</strong> benchmark B7 comparativo sectorial</td></tr>
+    <tr><td>Threat indicators</td><td>{incidences} hallazgo(s) con impacto decimal</td></tr>
+    <tr><td>Captura</td><td>{esc(utc_stamp)}</td></tr>
+  </table></div>
+  <div class="cover-footer"><span>Dominio: {esc(domain)} | Preparado: {esc(fecha_larga)}</span><span>Página 1</span></div>
 </div>
 """
 
@@ -269,7 +331,7 @@ def render_cover(company: str, domain: str, fecha_corta: str, fecha_larga: str,
 def render_about() -> str:
     return """
 <div class="pb">
-  <h2 class="sec" style="font-size:13pt;">Que es este Scorecard?</h2>
+  <h2 class="sec" id="sec-b7about" style="font-size:13pt;">Que es este Scorecard?</h2>
   <p>Servicio de calificacion de seguridad con sistema de letras de la <b>A</b> (maxima) a la
   <b>F</b> (minima) para la seguridad general y 10 factores de riesgo. Una empresa con C, D o F
   tiene 5,4 veces mas probabilidades de sufrir una filtracion importante que una con A o B.
@@ -355,6 +417,50 @@ def render_history_svg(hist: list[dict[str, Any]], industry_avg: int | None, col
     return "".join(svg)
 
 
+def _render_oasm_block_b7(p: dict[str, Any], domain: str, overall: int,
+                          issues: list[dict[str, Any]], hist: list[dict[str, Any]]) -> str:
+    if _oasm is None:
+        return ""
+    counts = _oasm.counts_from_findings(issues, key="sev")
+    assets = _oasm.asset_count(p)
+    dns = p.get("dns") or {}
+    cur = {
+        "overall_score": overall,
+        "score_general": overall,
+        "domain_score": None,
+        "subdomains": len(p.get("subdomains") or []) + len(p.get("crt_subdomains") or []),
+        "ips": len(dns.get("ipv4") or []),
+        "ports": len(p.get("open_ports") or []),
+        "findings": len(issues),
+    }
+    prev = _oasm.previous_snapshot(domain)
+    trend_hist = _oasm.load_history(domain, 90, "overall_score") or hist or []
+    return (
+        '<div class="pb" style="page-break-before:always;">'
+        '<h2 class="sec" id="sec-b7oasm">Enriquecimiento OASM: Score 0-10, comparativa y tendencia</h2>'
+        + _oasm.render_score_header(counts, assets)
+        + '<div class="avoid">' + _oasm.render_comparison_block(domain, cur, prev) + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + _oasm.render_trend_block(trend_hist) + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + _oasm.render_lifecycle_block(domain, issues) + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_eeasm.render_asset_change_block(domain, p) if _eeasm is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_eeasm.render_permutation_block(domain, p) if _eeasm is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_sc.render_provider_scorecard_block(domain, p) if _sc is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_sc.render_toolchain_scorecard_block() if _sc is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_hotlist.render_hotlist_block(domain, p) if _hotlist is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_origin.render_origin_block(domain, p) if _origin is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_dnsx.render_dns_extra_block(domain, p) if _dnsx is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_xen.render_fusion_block(domain, p) if _xen is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_xen.render_ctem_block(domain, p) if _xen is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_xen.render_insurance_block(domain, p) if _xen is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_xen.render_pqc_block(domain, p) if _xen is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_xen.render_ransomware_block(domain, p) if _xen is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_rng.render_gf_block(domain, p) if _rng is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_rng.render_interesting_block(domain, p) if _rng is not None else "") + '</div>'
+        + '<div class="avoid" style="margin-top:4mm;">' + (_rng.render_webports_block(domain, p) if _rng is not None else "") + '</div>'
+        + '</div>'
+    )
+
+
 def render_overview(company: str, domain: str, sector: str, overall: int,
                     scores: dict[str, int], incidences: dict[str, int],
                     hist: list[dict[str, Any]], industry_avg: int | None) -> str:
@@ -376,18 +482,18 @@ def render_overview(company: str, domain: str, sector: str, overall: int,
         "para el historial de 30 dias (solo datos del escaneo).</div>"
     )
     return f"""
-<div class="pb">
-  <h2 class="sec">Vision general del Scorecard</h2>
+<div class="pb" style="page-break-before:always;">
+  <h2 class="sec" id="sec-b7overview">Vision general del Scorecard</h2>
   <div class="mod-head">{hex_grade(letter, 54, 24)}
     <div><div style="font-size:17pt;">{esc(company)}</div>
-    <div style="color:#6B7280; font-size:11pt;">Puntuacion de seguridad: {overall}</div></div>
+    <div style="color:#6B7280; font-size:11pt;">Puntuación de seguridad: {overall}</div></div>
   </div>
   <div class="meta"><span><b>DOMINIO:</b> {esc(domain)}</span><span><b>SECTOR:</b> {esc(sector)}</span></div>
-  <h3 class="mod" style="font-size:13pt; text-transform:none; margin-bottom:2mm;">Factores de Riesgo</h3>
+  <h3 class="mod" style="font-size:13pt; text-transform:none; margin-bottom:2mm;">Factores de Riesgo de Overall Score</h3>
   <div class="factors avoid"><div>{"".join(left)}</div><div>{"".join(right)}</div></div>
-  <h2 class="sec" style="margin-top:8mm;">Historial del Score en los ultimos 30 dias</h2>
-  <p style="font-size:9pt;">Los picos representan mejoras y correccion de incidencias; las caidas,
-  configuraciones erroneas o actividad prolongada de malware.</p>
+  <div style="page-break-before:always;"></div><h2 class="sec" id="sec-b7hist" style="margin-top:8mm;">Historial del Score en los últimos 30 días / Overall Score</h2>
+  <p style="font-size:9pt;">Los picos representan mejoras y corrección de incidencias; las caídas,
+  configuraciones erróneas o actividad prolongada de malware.</p>
   <div style="margin-top:3mm;">{hist_html}</div>
   <div class="hist-legend"><span><span class="sw" style="background:{col};"></span>{esc(domain)}</span>
   {f'<span><span class="sw" style="background:#8FA8D8;"></span>Our Industry ({industry_avg})</span>' if industry_avg is not None else '<span style="color:#9AA0A6;">Our Industry (sector sin referencia)</span>'}</div>
@@ -495,7 +601,7 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             return
         issues.append({"key": key, "factor": factor, "sev": sev, "impact": impact,
                        "tiny": tiny, "title": title, "desc": desc, "reco": reco,
-                       "cols": cols, "rows": rows})
+                       "cols": cols, "rows": rows, "domain": dom})
 
     H = _headers(p)
     csp_raw = H.get("content-security-policy", "")
@@ -505,23 +611,23 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
     # ---------- APPLICATION SECURITY ----------
     if not csp_raw:
         add("csp_missing", "appsec", "BAJA", -0.8,
-            "Falta la politica de seguridad de contenido (PSC)",
+            "Falta la política de seguridad de contenido (PSC)",
             "Sin PSC los atacantes pueden inyectar scripts (XSS), alterar datos, secuestrar "
-            "clics y cargar contenido inseguro; aumenta accesos no autorizados y exposicion de datos.",
-            ["Implemente la PSC via encabezados HTTP", "Defina script-src/style-src/img-src de confianza",
+            "clics y cargar contenido inseguro; aumenta accesos no autorizados y exposición de datos.",
+            ["Implemente la PSC vía encabezados HTTP", "Defina script-src/style-src/img-src de confianza",
              "Use nonce/hash para inline", "Endurezca gradualmente y monitoree violaciones"],
-            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[dom, "https", "1", final, obs]])
     else:
         txt = _norm(csp_raw)
         if "UNSAFE-INLINE" in txt or "UNSAFE-EVAL" in txt:
             add("csp_unsafe", "appsec", "BAJA", -1.1,
-                "La politica de seguridad de los contenidos contiene la directiva 'unsafe'",
-                "'unsafe-inline'/'unsafe-eval' expanden la superficie XSS y permiten ejecucion de "
-                "codigo en el dominio confiable; socavan la proteccion prevista de la PSC.",
-                ["Especifique origenes confiables en script-src/style-src", "Elimine unsafe-eval",
+                "La política de seguridad de los contenidos contiene la directiva 'unsafe'",
+                "'unsafe-inline'/'unsafe-eval' expanden la superficie XSS y permiten ejecución de "
+                "código en el dominio confiable; socavan la protección prevista de la PSC.",
+                ["Especifique orígenes confiables en script-src/style-src", "Elimine unsafe-eval",
                  "Use nonce/hash", "CSP estricta y minimalista"],
-                ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+                ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[dom, "https", "1", final, obs]])
         broad_vals = {"*", "http:", "https:", "data:", "http://", "https://",
                       "http://*", "https://*"}
@@ -531,19 +637,19 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             add("csp_broad", "appsec", "BAJA", -0.1,
                 "La politica de seguridad de contenido contiene directivas amplias",
                 "Valores como *, http: o data: permiten cargar recursos de casi cualquier origen, "
-                "incluidos dominios maliciosos; se pierde la proteccion anti-XSS.",
+                "incluidos dominios maliciosos; se pierde la protección anti-XSS.",
                 ["Dominios exactos en script-src/style-src", "Minimice comodines", "Use HTTPS y nonce/hash"],
-                ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+                ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[dom, "https", "1", final, obs]])
     fa = CSP.get("frame-ancestors", [])
     if not fa and not H.get("x-frame-options"):
         add("framing", "appsec", "BAJA", -0.4,
-            "El sitio no aplica las practicas recomendadas para evitar la incrustacion de contenido malintencionado",
-            "Sin frame-ancestors ni X-Frame-Options cualquiera puede embeber la pagina en iframes: "
+            "El sitio no aplica las prácticas recomendadas para evitar la incrustación de contenido malintencionado",
+            "Sin frame-ancestors ni X-Frame-Options cualquiera puede embeber la página en iframes: "
             "clickjacking, accesos no autorizados y robo de datos.",
             ["Agregue frame-ancestors 'self' o 'none' a la CSP",
              "Respalde con X-Frame-Options: SAMEORIGIN o DENY"],
-            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[dom, "https", "1", final, obs]])
     hsts_raw = H.get("strict-transport-security", "")
     if not hsts_raw:
@@ -553,7 +659,7 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             "no imponen HTTPS y la comunicacion puede interceptarse y manipularse.",
             ["Implemente HSTS", "max-age=31536000; includeSubDomains", "Cada recurso via HTTPS",
              "Pruebe la aplicacion"],
-            ["ANALISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+            ["ANÁLISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [["no_hsts", dom, "https", "1", final, obs]])
     else:
         hs = _parse_hsts(hsts_raw)
@@ -566,79 +672,79 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             weak.append("hsts_missing_subdomain")
         for w in weak:
             add(f"hsts_{w}", "appsec", "BAJA", -0.1,
-                "Politica HSTS debil o incompleta",
-                f"Hallazgo {w}: max-age={hs['max_age']}, includeSubDomains={'si' if hs['subdomains'] else 'no'}. "
-                "Una politica corta, sin subdominios o duplicada deja ventanas de degradacion a HTTP.",
-                ["max-age=31536000; includeSubDomains", "Un solo encabezado HSTS canonico"],
-                ["ANALISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+                "Política HSTS débil o incompleta",
+                f"Hallazgo {w}: max-age={hs['max_age']}, includeSubDomains={'sí' if hs['subdomains'] else 'no'}. "
+                "Una política corta, sin subdominios o duplicada deja ventanas de degradación a HTTP.",
+                ["max-age=31536000; includeSubDomains", "Un solo encabezado HSTS canónico"],
+                ["ANÁLISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[w, dom, "https", "1", final, obs]])
     xcto = H.get("x-content-type-options", "")
     if not xcto:
         add("xcto_missing", "appsec", "BAJA", -0.1,
-            "El sitio web no implementa las practicas recomendadas de X-Content-Type-Options",
-            "Sin 'nosniff' los navegadores interpretan contenido por heuristica (MIME sniffing) y "
-            "pueden ejecutar scripts maliciosos: XSS por confusion de tipos.",
+            "El sitio web no implementa las prácticas recomendadas de X-Content-Type-Options",
+            "Sin 'nosniff' los navegadores interpretan contenido por heurística (MIME sniffing) y "
+            "pueden ejecutar scripts maliciosos: XSS por confusión de tipos.",
             ["Agregue X-Content-Type-Options: nosniff", "Complemente con PSC"],
-            ["ANALISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+            ["ANÁLISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[f"x_content_type_options_missing", dom, "https", "1", final, obs]])
     elif len({x.strip().lower() for x in xcto.split(",") if x.strip()}) > 1 or xcto.count("nosniff") > 1:
         add("xcto_multiple", "appsec", "BAJA", -0.1,
-            "Encabezado X-Content-Type-Options multiple o inconsistente",
-            f"Se observaron valores en conflicto ({xcto[:80]}); la proteccion nosniff queda ambigua.",
-            ["Un solo valor canonico: nosniff"],
-            ["ANALISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+            "Encabezado X-Content-Type-Options múltiple o inconsistente",
+            f"Se observaron valores en conflicto ({xcto[:80]}); la protección nosniff queda ambigua.",
+            ["Un solo valor canónico: nosniff"],
+            ["ANÁLISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [["x_content_type_options_multiple", dom, "https", "1", final, obs]])
     chain = (p.get("https") or {}).get("redirect_chain") or []
     chain_txt = " ".join(str(x) for x in chain)
     if "http://" in chain_txt.replace("https://", ""):
         steps = [str(x)[:100] for x in chain[:2]]
         add("redirect_http", "appsec", "MEDIA", -1.9,
-            "La cadena de redireccion contiene HTTP",
-            "Pasos sin cifrar exponen datos a interceptacion y redirecciones a destinos inseguros "
+            "La cadena de redirección contiene HTTP",
+            "Pasos sin cifrar exponen datos a interceptación y redirecciones a destinos inseguros "
             "(phishing, MITM).",
-            ["Cada eslabon en HTTPS", "Rutas relativas", "HSTS en la cadena completa"],
-            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "URL INICIAL", "FECHA DE ULTIMA OBSERVACION"],
+            ["Cada eslabón en HTTPS", "Rutas relativas", "HSTS en la cadena completa"],
+            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "URL INICIAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[dom, "https", "1", final, steps[0] if steps else "—", obs]])
     p80 = (p.get("port_80") or {}).get("open")
     https_ok = bool((p.get("https") or {}).get("https_ok")) or final.startswith("https")
     if p80 and not https_ok:
         add("no_https", "appsec", "BAJA", -1.0,
             "El sitio no aplica HTTPS",
-            "Sin HTTPS los datos viajan legibles: interceptacion, suplantacion y manipulacion; los "
+            "Sin HTTPS los datos viajan legibles: interceptación, suplantación y manipulación; los "
             "navegadores advierten y los buscadores penalizan.",
-            ["Certificado valido y redireccion HTTP->HTTPS", "HSTS"],
-            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+            ["Certificado válido y redirección HTTP->HTTPS", "HSTS"],
+            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[dom, "http", "1", f"http://{dom}/", obs]])
     fp = str((p.get("https") or {}).get("server_fingerprint") or "")
     cloud = p.get("cloud_storage") or {}
     if "amazons3" in _norm(fp) or (cloud.get("publicos") or cloud.get("buckets")):
         add("object_storage", "appsec", "BAJA", -0.1,
             "Sitio alojado en almacenamiento de objetos",
-            "Object storage es para contenido estatico; permisos mal configurados exponen datos y "
+            "Object storage es para contenido estático; permisos mal configurados exponen datos y "
             "ata la disponibilidad a un tercero.",
             ["ACL estrictas", "Cifrado", "CDN", "Multi-region"],
-            ["ANALISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ULTIMA OBSERVACION"],
+            ["ANÁLISIS", "DOMINIO", "ESQUEMA", "OBSERVACIONES", "URL FINAL", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [["server_header_is_amazon_s3" if "amazons3" in _norm(fp) else "object_storage",
               dom, "https", "1", final, obs]], tiny=True)
     for c in (p.get("cookie_findings") or []):
         t = _norm(str(c.get("title", "")) + " " + str(c.get("rule", "")) + " " + str(c))
         if "SECURE" in t and ("FALTA" in t or "MISSING" in t or "SIN" in t or "NO " in t):
             add("cookie_secure", "appsec", "ALTA", -8.3,
-                'Falta el atributo "Secure" en la cookie de sesion',
-                "La cookie viaja tambien por HTTP y puede interceptarse en redes no seguras: secuestro "
-                "de sesion y acceso no autorizado.",
-                ["HTTPS en el sitio completo", "Atributo secure explicito", "Cookies de sesion en servidor"],
-                ["DOMINIO", "URL", "OBSERVACIONES", "FECHA DE ULTIMA OBSERVACION"],
+                'Falta el atributo "Secure" en la cookie de sesión',
+                "La cookie viaja también por HTTP y puede interceptarse en redes no seguras: secuestro "
+                "de sesión y acceso no autorizado.",
+                ["HTTPS en el sitio completo", "Atributo secure explícito", "Cookies de sesión en servidor"],
+                ["DOMINIO", "URL", "OBSERVACIONES", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[dom, final, "1", obs]])
             break
     scripts = _fetch_external_scripts(dom) if dom else []
     if scripts:
         add("sri_missing", "appsec", "ALTA", -3.6,
-            "Implementacion insegura de la integridad de recursos secundarios (SRI)",
-            "Scripts externos sin hash de integridad pueden manipularse en origen: inyeccion de "
-            "codigo, XSS y robo de datos.",
-            ["Hashes SRI en cada recurso externo", "Rotacion de hashes", "CSP restrictiva", "Auditorias"],
-            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "FECHA DE ULTIMA OBSERVACION"],
+            "Implementación insegura de la integridad de recursos secundarios (SRI)",
+            "Scripts externos sin hash de integridad pueden manipularse en origen: inyección de "
+            "código, XSS y robo de datos.",
+            ["Hashes SRI en cada recurso externo", "Rotación de hashes", "CSP restrictiva", "Auditorías"],
+            ["DOMINIO", "ESQUEMA", "OBSERVACIONES", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[dom, "https", str(len(scripts)), obs]])
         issues[-1]["ev_rows"] = [[s] for s in scripts]
 
@@ -646,34 +752,45 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
     dns = p.get("dns") or {}
     if not dns.get("dnssec_ok"):
         add("cubit_dnssec", "cubit", "BAJA", -0.1, "Sin DNSSEC",
-            "Respuestas DNS sin firma: suplantacion de registros posible.",
+            "Respuestas DNS sin firma: suplantación de registros posible.",
             ["Firme la zona con DNSSEC"],
-            ["DOMINIO", "FECHA DE ULTIMA OBSERVACION"], [[dom, obs]])
+            ["DOMINIO", "FECHA DE ÚLTIMA OBSERVACIÓN"], [[dom, obs]])
     if not p.get("caa_records"):
         add("cubit_caa", "cubit", "BAJA", -0.1, "Sin registros CAA",
             "Cualquier CA puede emitir certificados del dominio.",
             ["Registro CAA con sus CA autorizadas"],
-            ["DOMINIO", "FECHA DE ULTIMA OBSERVACION"], [[dom, obs]])
+            ["DOMINIO", "FECHA DE ÚLTIMA OBSERVACIÓN"], [[dom, obs]])
     if not p.get("mta_sts"):
         add("cubit_mtasts", "cubit", "BAJA", -0.1, "Sin MTA-STS",
             "Entrega de correo sin TLS impuesto entre servidores.",
-            ["Politica MTA-STS + TLS-RPT"],
-            ["DOMINIO", "FECHA DE ULTIMA OBSERVACION"], [[dom, obs]])
+            ["Política MTA-STS + TLS-RPT"],
+            ["DOMINIO", "FECHA DE ÚLTIMA OBSERVACIÓN"], [[dom, obs]])
 
     # ---------- DNS ----------
     if not dns.get("spf_record"):
         add("spf_missing", "dns", "BAJA", -0.1, "Falta el registro de SPF",
-            "Sin SPF cualquiera puede falsificar el dominio: phishing, spam y dano reputacional; "
-            "los legitimos pueden rebotar.",
-            ["Registro SPF con remitentes autorizados", "DMARC estricta", "DKIM", "Revision periodica"],
-            ["DOMINIO", "FECHA DE ULTIMA OBSERVACION"], [[dom, obs]])
+            "Sin SPF cualquiera puede falsificar el dominio: phishing, spam y daño reputacional; "
+            "los legítimos pueden rebotar.",
+            ["Registro SPF con remitentes autorizados", "DMARC estricta", "DKIM", "Revisión periódica"],
+            ["DOMINIO", "FECHA DE ÚLTIMA OBSERVACIÓN"], [[dom, obs]])
+    _mx_txt = ", ".join(m.get("exchange", "") for m in (dns.get("mx_records") or []) if isinstance(m, dict))[:90]
+    if (dns.get("mx_records") or []) and not dns.get("dmarc_record"):
+        add("dmarc_missing", "dns", "BAJA", -0.5, "Falta el registro DMARC",
+            "Con correo en uso (MX) y sin DMARC no hay política ni reportes contra spoofing del dominio.",
+            ["Inventariar remitentes legítimos", "DMARC p=none con rua/ruf", "Avanzar a quarantine y luego reject"],
+            ["DOMINIO", "MX", "FECHA DE ÚLTIMA OBSERVACIÓN"], [[dom, _mx_txt or "—", obs]])
+    if (dns.get("mx_records") or []) and not dns.get("dkim_records"):
+        add("dkim_missing", "dns", "BAJA", -0.3, "Sin DKIM publicado",
+            "Con correo en uso (MX) y sin selectores DKIM los mensajes no van firmados.",
+            ["Publicar selectores DKIM del proveedor de correo", "Rotar claves"],
+            ["DOMINIO", "MX", "FECHA DE ÚLTIMA OBSERVACIÓN"], [[dom, _mx_txt or "—", obs]])
     typos = [t for t in (p.get("typosquatting") or []) if isinstance(t, dict) and t.get("domain")]
     no_spf = _typo_spf_missing(typos) if typos else []
     if no_spf:
         add("spf_typo", "dns", "BAJA", -0.1, "Dominios lookalike sin SPF",
             "Typosquats del dominio sin SPF listos para phishing con remitente falsificado.",
             ["Monitoreo de lookalikes", "Registro defensivo/UDRP", "SPF+DMARC donde controle"],
-            ["DOMINIO", "FECHA DE ULTIMA OBSERVACION"],
+            ["DOMINIO", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[t, obs] for t in no_spf[:10]])
 
     # ---------- ENDPOINT ----------
@@ -682,8 +799,8 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             add("takeover", "endpoint", "MEDIA", -1.0, "Subdomain takeover posible",
                 f"Subdominio {t.get('subdomain', '?')} apunta a recurso liberado: un atacante puede "
                 "tomarlo y servir contenido bajo su marca.",
-                ["Elimine CNAME huesfanos", "Reclame o libere el recurso"],
-                ["SUBDOMINIO", "DESTINO", "FECHA DE ULTIMA OBSERVACION"],
+                ["Elimine CNAME huérfanos", "Reclame o libere el recurso"],
+                ["SUBDOMINIO", "DESTINO", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[str(t.get("subdomain", "?")), str(t.get("cname", t.get("target", "?")))[:60], obs]])
             break
 
@@ -695,9 +812,9 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
         if (rw + rl) > 0:
             add("cti", "chatter", "BAJA", -0.1,
                 "Menciones en fuentes CTI (ransomware)",
-                f"{rw + rl} mencion(es) en monitores de ransomware: exposicion reputacional a revisar.",
+                f"{rw + rl} mencion(es) en monitores de ransomware: exposición reputacional a revisar.",
                 ["Valide si el activo es propio", "Correlacione con incidentes"],
-                ["DOMINIO", "OBSERVACIONES", "FECHA DE ULTIMA OBSERVACION"],
+                ["DOMINIO", "OBSERVACIONES", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[dom, str(rw + rl), obs]])
     except Exception:
         pass
@@ -708,16 +825,30 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             add(f"dnsbl_{rep.get('ip', '')}_{rep.get('dnsbl', '')}", "iprep", "BAJA", -0.5,
                 "IP listada en DNSBL",
                 f"La IP {rep.get('ip', '?')} aparece en {rep.get('dnsbl', '?')}: riesgo de bloqueo de "
-                "correo y clasificacion de abuso.",
+                "correo y clasificación de abuso.",
                 ["Investigue la causa (spam/malware)", "Solicite deslistado", "Endurezca el host"],
-                ["DIRECCION IP", "LISTA", "FECHA DE ULTIMA OBSERVACION"],
+                ["DIRECCION IP", "LISTA", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[str(rep.get("ip", "?")), str(rep.get("dnsbl", "?")), obs]])
     uh = p.get("urlhaus") or {}
     if isinstance(uh, dict) and uh.get("malicious"):
         add("urlhaus", "iprep", "MEDIA", -1.0, "URL maliciosa reportada (URLhaus)",
-            "El dominio/IP distribuye o alojo malware segun URLhaus.",
+            "El dominio/IP distribuye o aloja malware según URLhaus.",
             ["Limpie el recurso", "Rote credenciales", "Solicite baja del listado"],
-            ["DOMINIO", "FECHA DE ULTIMA OBSERVACION"], [[dom, obs]])
+            ["DOMINIO", "FECHA DE ÚLTIMA OBSERVACIÓN"], [[dom, obs]])
+    scr = p.get("supply_chain_reputation") or {}
+    _sdnsbl = [e for e in (scr.get("dnsbl") or []) if isinstance(e, dict) and e.get("dnsbl")]
+    _suh = [e for e in (scr.get("urlhaus") or []) if isinstance(e, dict)]
+    if _sdnsbl or _suh:
+        _srows = []
+        for e in (_sdnsbl[:4] + _suh[:2]):
+            _srows.append([str(e.get("ip") or e.get("host") or e.get("url", "?"))[:40],
+                           str(e.get("dnsbl") or e.get("list") or "URLhaus")[:40], obs])
+        add("supply_reputation", "iprep", "BAJA", -0.3,
+            "Terceros listados en DNSBL/URLhaus",
+            "Dependencias de terceros aparecen en listas de reputación: valide titularidad y "
+            "corrobore; shared sin corroboración es contextual, no riesgo directo del proveedor.",
+            ["Valide ownership (whois/ASN)", "Corrobore con URLhaus/VT", "Documente shared como contextual"],
+            ["IP/URL", "LISTA", "FECHA DE ÚLTIMA OBSERVACIÓN"], _srows)
 
     # ---------- INFO LEAK ----------
     leaks = [l for l in (p.get("credential_leaks") or []) if isinstance(l, dict) and "error" not in l]
@@ -730,14 +861,14 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             "Credenciales asociadas a cuentas del dominio vistas en logs de infostealers o "
             "filtraciones: venta o acceso a activos del dominio.",
             ["Rote credenciales", "MFA", "Revise logins fallidos (MITRE ATT&CK)"],
-            ["DOMINIO", "USUARIO", "FUENTE", "FECHA DE ULTIMA OBSERVACION"], rows)
+            ["DOMINIO", "USUARIO", "FUENTE", "FECHA DE ÚLTIMA OBSERVACIÓN"], rows)
     try:
         bi = (((p.get("kumo") or {}).get("breachintel") or {}).get("summary")) or {}
         if int(bi.get("total_employees_leaked", 0) or 0) > 0:
             add("breachintel", "leak", "BAJA", -0.1, "Empleados en filtraciones conocidas",
                 f"{bi.get('total_employees_leaked')} empleado(s) en breaches: {', '.join((bi.get('breach_names') or [])[:3])}.",
                 ["Rote y MFA", "Concientizacion anti-reuso"],
-                ["DOMINIO", "OBSERVACIONES", "FECHA DE ULTIMA OBSERVACION"],
+                ["DOMINIO", "OBSERVACIONES", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[dom, str(bi.get("total_employees_leaked")), obs]])
     except Exception:
         pass
@@ -749,7 +880,7 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
         add("tls_weak", "network", "ALTA", -10.0, "El servicio SSL/TLS admite un protocolo debil",
             f"Version negociada {ver}: MITM, secuestro de sesion y descifrado posibles.",
             ["Solo TLS 1.2+ con suites solidas", "Actualice librerias", "Autenticacion mutua donde aplique"],
-            ["OBJETIVO", "PUERTO", "OBSERVACIONES", "FECHA DE ULTIMA OBSERVACION"],
+            ["OBJETIVO", "PUERTO", "OBSERVACIONES", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[_first_ipv4(p), "443", "1", obs]])
     ports = [o for o in (p.get("open_ports") or []) if isinstance(o, dict) and o.get("state") == "open"]
     svc_map = {21: ("ftp", "Se ha observado un servicio FTP", "MEDIA", -5.9,
@@ -770,13 +901,13 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             k, title, sev, imp, desc = svc_map[pn]
             add(f"svc_{k}_{pn}", "network", sev, imp, title, desc,
                 ["Retire de Internet si es posible", "Lista blanca de IPs", "Audite configuracion"],
-                ["NOMBRE DE PRODUCTO", "DIRECCION IP", "PUERTO", "FECHA DE ULTIMA OBSERVACION"],
+                ["NOMBRE DE PRODUCTO", "DIRECCION IP", "PUERTO", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[str(o.get("product", o.get("service", k)))[:40], _first_ipv4(p), str(pn), obs]])
         elif pn in (8080, 3128, 8000, 8888) or "proxy" in blob:
             add(f"proxy_{pn}", "network", "MEDIA", -1.0, "Servicio proxy HTTP detectado",
                 "Un proxy intermediario puede interceptar credenciales y trafico si se compromete.",
                 ["HTTPS extremo a extremo", "Autenticacion fuerte", "Parche y audite el proxy"],
-                ["NOMBRE DE PRODUCTO", "DIRECCION IP", "PUERTO", "FECHA DE ULTIMA OBSERVACION"],
+                ["NOMBRE DE PRODUCTO", "DIRECCION IP", "PUERTO", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[str(o.get("product", o.get("service", "http-proxy")))[:40], _first_ipv4(p), str(pn), obs]])
     exp = str(tls.get("cert_expiry") or "").replace("GMT", "").strip()
     try:
@@ -786,7 +917,7 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             add("cert_expired", "network", "BAJA", -1.0, "El certificado ha caducado",
                 "Los clientes TLS rechazan la conexion; renueve o desmantele el servicio.",
                 ["Confirme uso", "Nuevo certificado con su CA", "Politica de renovacion"],
-                ["OBJETIVO", "HUELLA DIGITAL SHA-256", "SERIAL NUMBER", "OBSERVACIONES", "FECHA DE ULTIMA OBSERVACION"],
+                ["OBJETIVO", "HUELLA DIGITAL SHA-256", "SERIAL NUMBER", "OBSERVACIONES", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[_first_ipv4(p), "—", fp, "1", obs]])
     except Exception:
         pass
@@ -795,7 +926,7 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
         add("cert_selfsigned", "network", "BAJA", -0.7, "El certificado es autofirmado",
             "Fuera del trust store: los clientes no conectan y hay riesgo MITM.",
             ["Certificado de CA publica o desmantele"],
-            ["OBJETIVO", "OBSERVACIONES", "FECHA DE ULTIMA OBSERVACION"],
+            ["OBJETIVO", "OBSERVACIONES", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[_first_ipv4(p), "1", obs]])
 
     # ---------- PATCHING ----------
@@ -824,7 +955,7 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
             f"Vulnerabilidad {cid} en servicio (ultima observacion)",
             f"{str(v.get('description', v.get('desc', 'CVE en software expuesto')))[:180]}",
             ["Parchee/actualice", "Actualizaciones automaticas", "Monitoree NVD/EPSS"],
-            ["VULNERABILIDAD", "DIRECCION IP", "PUERTO", "FECHA DE ULTIMA OBSERVACION"],
+            ["VULNERABILIDAD", "DIRECCION IP", "PUERTO", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[cid, _first_ipv4(p), str(v.get("port", "443")), obs]])
     for t in (p.get("patching") or [])[:4]:
         if isinstance(t, dict) and t.get("status") == "eol":
@@ -832,7 +963,7 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
                 f"Tecnologia sin soporte (EOL): {t.get('technology', '?')}",
                 "Sin parches del fabricante: explotacion conocida probable.",
                 ["Migree a version soportada", "Controles compensatorios"],
-                ["TECNOLOGIA", "VERSION", "FECHA DE ULTIMA OBSERVACION"],
+                ["TECNOLOGIA", "VERSION", "FECHA DE ÚLTIMA OBSERVACIÓN"],
                 [[str(t.get("technology", "?")), str(t.get("version", "—")), obs]])
 
     # ---------- SOCIAL ----------
@@ -840,8 +971,39 @@ def collect_issues(p: dict[str, Any]) -> list[dict[str, Any]]:
         add("typo", "social", "BAJA", -0.1, "Dominios lookalike registrados (typosquatting)",
             "Dominios con errores tipograficos listos para phishing contra su marca.",
             ["Monitoreo continuo", "Registro defensivo/UDRP"],
-            ["DOMINIO", "FECHA DE ULTIMA OBSERVACION"],
+            ["DOMINIO", "FECHA DE ÚLTIMA OBSERVACIÓN"],
             [[str(t.get("domain", "?")), obs] for t in typos[:10]])
+    # ---------- STRIX (pentest autonomo con IA) ----------
+    strix = p.get("strix") or {}
+    if strix.get("status") == "ok":
+        _sv = {"critical": ("ALTA", -3.0), "high": ("ALTA", -3.0),
+               "medium": ("MEDIA", -1.5), "low": ("BAJA", -0.8), "info": ("BAJA", -0.1)}
+        for f in (strix.get("findings") or [])[:10]:
+            if not isinstance(f, dict):
+                continue
+            sk = str(f.get("severity", "info")).lower()
+            sev, imp = _sv.get(sk, ("BAJA", -0.1))
+            vid = str(f.get("id") or "STRIX")[:24]
+            cve = str(f.get("cve") or "-")
+            cvss = str(f.get("cvss") or "-")
+            cwe = str(f.get("cwe") or "-")
+            endpoint = str(f.get("endpoint") or dom)
+            steps = f.get("remediation_steps")
+            if isinstance(steps, list) and steps:
+                reco = [str(s)[:200] for s in steps[:4]]
+            else:
+                reco = ["Aplicar la remediacion indicada por Strix"]
+            ev = str(f.get("evidence") or f.get("technical_analysis") or "")[:300]
+            add("strix_" + vid, "appsec", sev, imp,
+                f"Pentest IA (Strix): {str(f.get('title') or 'hallazgo')[:90]}",
+                f"Hallazgo {sk.upper()} del pentest autonomo con IA sobre {endpoint}"
+                + (f" (CVSS {cvss})" if cvss != "-" else "")
+                + (f" - {cve}" if cve != "-" else "")
+                + (f" - {cwe}" if cwe != "-" else "") + ".",
+                reco,
+                ["DOMINIO", "ID", "SEVERIDAD", "CVSS", "CVE", "CWE", "CONFIANZA", "ESFUERZO", "EVIDENCIA"],
+                [[dom, vid, sk.upper(), cvss, cve, cwe, str(f.get("confidence") or "-"),
+                  str(f.get("fix_effort") or "-"), ev]])
     return issues
 
 
@@ -866,12 +1028,12 @@ def render_action_items(by_factor: dict[str, list[dict[str, Any]]]) -> str:
             rows.append(
                 f'<tr><td></td><td>{sev_bars(it["sev"])}</td>'
                 f'<td class="impact" style="font-size:12pt;">{fmt_impact(it["impact"], it.get("tiny", False))}</td>'
-                f'<td><b>{esc(it["title"])}</b>. {esc(it["desc"])}</td></tr>')
+                f'<td><b>{esc(it["title"])}</b> {(_oasm.render_finding_badges(it) if _oasm else "")}. {esc(it["desc"])}</td></tr>')
     body = "".join(rows) if rows else (
-        "<tr><td colspan='4' style='text-align:center; color:#9AA0A6;'>No se encontro ningun problema</td></tr>")
+        "<tr><td colspan='4' style='text-align:center; color:#9AA0A6;'>No se encontró ningún problema</td></tr>")
     return f"""
 <div class="pb">
-  <h2 class="sec">Elementos de accion</h2>
+  <h2 class="sec" id="sec-b7action">Elementos de accion</h2>
   <table class="act"><thead><tr><th style="width:22%;">Factor</th><th style="width:10%;">Gravedad</th>
   <th style="width:16%;">Impacto en el Score</th><th>Problemas detectados</th></tr></thead>
   <tbody>{body}</tbody></table>
@@ -888,7 +1050,7 @@ def render_evidence_table(it: dict[str, Any]) -> str:
     extra = ""
     for er in it.get("ev_rows", [])[:6]:
         extra += f"<tr><td colspan='{len(it['cols'])}' class='evidence'>Evidence: {esc(er[0])}</td></tr>"
-    return (f"<div class='nres'>{len(it['rows'])} resultado{'s' if len(it['rows']) != 1 else ''}</div>"
+    return (f"<div class='nres'>{len(it['rows'])} fila(s) de evidencia (1 hallazgo = 1 incidencia)</div>"
             f"<table class='ev'><thead><tr>{th}</tr></thead><tbody>{''.join(trs)}{extra}</tbody></table>")
 
 
@@ -902,12 +1064,12 @@ def render_module(key: str, name: str, desc: str, score: int,
     for sev in ("ALTA", "MEDIA", "BAJA"):
         inner = "<br>".join(
             f"{esc(it['title'])} <b style='float:right;'>{len(it['rows'])}</b>" for it in items if it["sev"] == sev
-        ) or f"<span class='n'>No hay Problemas de gravedad {'alta' if sev == 'ALTA' else 'media' if sev == 'MEDIA' else 'baja'} para {esc(name.title())}</span>"
+        ) or f"<span class='n'>No hay problemas de gravedad {'alta' if sev == 'ALTA' else 'media' if sev == 'MEDIA' else 'baja'} para {esc(name)}</span>"
         boxes.append(
             f"<div class='sevcol' style='background:{SEV_BG[sev]};'>{sev_bars(sev)}"
             f"<span class='t'>GRAVEDAD {sev}</span><div style='margin-top:2mm;'>{inner}</div></div>")
     if not items:
-        detail = '<div class="nodata">No se encontro ningun problema</div>'
+        detail = '<div class="nodata">No se encontró ningún problema</div>'
     else:
         parts = []
         for it in items:
@@ -918,14 +1080,14 @@ def render_module(key: str, name: str, desc: str, score: int,
                 f"<span class='impact'>{fmt_impact(it['impact'], it.get('tiny', False))} "
                 f"<small>IMPACTO EN EL SCORE</small></span></div>"
                 f"<p style='margin:2mm 0;'>{esc(it['desc'])}</p>"
-                f"<div class='twocol'><div><h5>Descripcion</h5><p>{esc(it['desc'])}</p></div>"
-                f"<div><h5>Recomendacion</h5><ul>{reco}</ul></div></div>"
+                f"<div class='twocol'><div><h5>Descripción</h5><p>{esc(it['desc'])}</p></div>"
+                f"<div><h5>Recomendación</h5><ul>{reco}</ul></div></div>"
                 f"{render_evidence_table(it)}</div>")
         detail = "".join(parts)
     return f"""
 <div class="pb">
   <div class="mod-head">{hex_grade(letter, 44, 19)}<span class="score">{score}</span>
-    <h3 class="mod">{esc(name)}</h3></div>
+    <h3 class="mod" id="sec-b7mod-{esc(key)}">{esc(name)}</h3></div>
   <p>{esc(desc)}</p>
   <div class="sevbox avoid"><div class="sevrow">{"".join(boxes)}</div></div>
   {detail}
@@ -936,7 +1098,7 @@ def render_module(key: str, name: str, desc: str, score: int,
 def render_legal(company: str) -> str:
     return f"""
 <div class="pb legal">
-  <h2 class="sec" style="font-size:15pt;">Nota legal</h2>
+  <h2 class="sec" id="sec-b7legal" style="font-size:15pt;">Nota legal</h2>
   <p>Los analisis, calificaciones y declaraciones de este documento son opiniones sobre riesgos
   futuros relativos de seguridad a la fecha indicada; no constituyen hechos historicos, recomendaciones
   de negocio ni avales de exactitud. Formula {FORMULA_VERSION}: 10 factores 0-100 con impacto
@@ -948,6 +1110,73 @@ def render_legal(company: str) -> str:
 """
 
 
+def b7_provider_scores(p: dict[str, Any], matrix: list | None = None) -> dict[str, Any]:
+    """Motor B7 por proveedor (reutilizable por B6): base precia + issues con
+    impacto decimal (incl. OWASP Agentic/Web) -> scores, incidencias y overall."""
+    try:
+        base = dict(_precia_scores(p)) if _precia_scores else {}
+    except Exception:
+        base = {}
+    for k, _, _ in SSC_FACTORS:
+        base.setdefault(k, 100)
+    domain = str(p.get("domain", "—"))
+    issues = collect_issues(p)
+    for m in (matrix or []):
+        if isinstance(m, dict) and (m.get("dominio") == domain or m.get("domain") == domain):
+            for key, label in (("owasp", "OWASP Agentic Top 10"), ("owasp_web", "OWASP Web Top 10 (2025)")):
+                ow = m.get(key) or {}
+                if ow and not ow.get("error") and str(ow.get("overall_grade", "?")).strip() not in ("?", "", "-", "N/A"):
+                    grade = ow.get("overall_grade", "--")
+                    pct = ow.get("overall_compliance", 0)
+                    det = "; ".join(
+                        f"{rid} {rd.get('grade', '?')} ({rd.get('compliance_pct', '?')}%)"
+                        for rid, rd in sorted((ow.get("risks") or {}).items())
+                        if isinstance(rd, dict) and rd.get("finding_count", 0) > 0
+                    ) or "Sin hallazgos que afecten compliance"
+                    sev = "ALTA" if grade in ("F", "D") else "MEDIA" if grade == "C" else "BAJA"
+                    imp = -3.0 if grade in ("F", "D") else (-1.5 if grade == "C" else -0.5)
+                    issues.append({"key": key + "_b7", "factor": "appsec", "sev": sev, "impact": imp,
+                                   "tiny": False,
+                                   "title": f"{label} — Grado {grade} ({pct}%)",
+                                   "desc": f"Evaluacion {label} del dominio con cumplimiento {pct}%. Riesgos afectados: {det}.",
+                                   "reco": ["Revisar los riesgos con grado F y D",
+                                            "Corregir cabeceras/TLS/DNS que bajan compliance",
+                                            "Re-escanear para verificar remediacion"],
+                                   "cols": ["DOMINIO", "MARCO", "GRADO", "CUMPLIMIENTO", "RIESGOS AFECTADOS"],
+                                   "rows": [[domain, label, str(grade), f"{pct}%", det[:300]]]})
+            break
+    by_factor = issues_by_factor(issues)
+    scores = {}
+    for k, _, _ in SSC_FACTORS:
+        deduc = sum(i["impact"] for i in by_factor.get(k, []))
+        scores[k] = max(0, min(100, round(base.get(k, 100) + deduc)))
+    try:
+        overall = int(_precia_overall(scores)) if _precia_overall else int(sum(scores.values()) / max(len(scores), 1))
+    except Exception:
+        overall = 0
+    incidences = {k: len(by_factor.get(k, [])) for k, _, _ in SSC_FACTORS}
+    return {"scores": scores, "by_factor": by_factor, "issues": issues,
+            "base": base, "overall": overall, "incidences": incidences}
+
+
+def render_toc_b7() -> str:
+    if _render_toc is None:
+        return ""
+    sections: list[tuple[str, str, str]] = [
+        ("1", "Acerca de este informe", "sec-b7about"),
+        ("2", "Visión general del Scorecard", "sec-b7overview"),
+        ("2.1", "Historial del Score (30 días)", "sec-b7hist"),
+        ("2.2", "Enriquecimiento OASM (Score 0-10, tendencia)", "sec-b7oasm"),
+        ("3", "Elementos de acción", "sec-b7action"),
+        ("4", "Detalle por factor", f"sec-b7mod-{SSC_FACTORS[0][0]}"),
+    ]
+    for i, (key, name, _desc) in enumerate(SSC_FACTORS, start=1):
+        sections.append((f"4.{i}", name.title(), f"sec-b7mod-{key}"))
+    sections.append(("5", "Nota legal", "sec-b7legal"))
+    return _render_toc(sections, title="Índice",
+                       subtitle="Tabla de contenido — haga clic para navegar")
+
+
 def build_report(asm: dict[str, Any], analista: str = "", email: str = "",
                  org: str = "GrupoCibest") -> str:
     providers = asm.get("providers") or []
@@ -956,12 +1185,9 @@ def build_report(asm: dict[str, Any], analista: str = "", email: str = "",
     company = str(p.get("name", "") or domain)
     now = datetime.now(timezone.utc)
     fecha_corta = f"{now.month}/{now.day}/{str(now.year)[2:]}"
-    try:
-        base = dict(_precia_scores(p)) if _precia_scores else {}
-    except Exception:
-        base = {}
-    for k, _, _ in SSC_FACTORS:
-        base.setdefault(k, 100)
+    _b7r = b7_provider_scores(p, asm.get("matrix"))
+    base, issues, by_factor = _b7r["base"], _b7r["issues"], _b7r["by_factor"]
+    scores, overall, incidences = _b7r["scores"], _b7r["overall"], _b7r["incidences"]
     industry_avg = 88
     try:
         sector_en = str(_precia_industry(p)) if _precia_industry else "—"
@@ -969,20 +1195,10 @@ def build_report(asm: dict[str, Any], analista: str = "", email: str = "",
         sector_en = "—"
     sector = SECTOR_ES.get(sector_en, sector_en.upper() if sector_en != "—" else "DESCONOCIDO")
     industry_avg = (_INDUSTRY_AVG or {}).get(sector_en) if _INDUSTRY_AVG else None
-    issues = collect_issues(p)
-    by_factor = issues_by_factor(issues)
-    scores = {}
-    for k, _, _ in SSC_FACTORS:
-        deduc = sum(i["impact"] for i in by_factor.get(k, []))
-        scores[k] = max(0, min(100, round(base.get(k, 100) + deduc)))
-    try:
-        overall = int(_precia_overall(scores)) if _precia_overall else int(sum(scores.values()) / len(scores))
-    except Exception:
-        overall = 0
-    incidences = {k: len(by_factor.get(k, [])) for k, _, _ in SSC_FACTORS}
     hist = history_from_db(domain)
     utc_stamp = fmt_utc_stamp(str(asm.get("generated_utc") or ""), now)
-    cover = render_cover(company, domain, fecha_corta, fecha_larga(now), analista, email, org, utc_stamp)
+    cover = render_cover(company, domain, fecha_corta, fecha_larga(now), analista, email, org, utc_stamp,
+                         int(overall), grade_of(overall), sector, len(issues))
     about = render_about().replace("__HEXA__", hex_grade("A", 64, 30))
     target_letter = grade_of(overall)
     about = about.replace('id="next-grade">Conseguir (A)',
@@ -990,18 +1206,19 @@ def build_report(asm: dict[str, Any], analista: str = "", email: str = "",
     about = about.replace('id="now-box"></div>',
                           f'id="now-box">El Score general de esta empresa<br>{hex_grade(target_letter, 64, 30)}</div>')
     overview = render_overview(company, domain, sector, overall, scores, incidences, hist, industry_avg)
+    oasm_block = _render_oasm_block_b7(p, domain, overall, issues, hist)
     action = render_action_items(by_factor)
     mods = "".join(render_module(k, n, d, int(scores.get(k, 100)), by_factor.get(k, []))
                    for k, n, d in SSC_FACTORS)
     legal = render_legal(company)
+    toc = render_toc_b7()
     return (f"<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'>"
             f"<title>Informe Detallado B7 - {esc(domain)}</title>"
             f"{ssc_css_vars(domain, fecha_corta)}<style>{CSS}</style></head><body>"
-            f"{cover}{about}{overview}{action}{mods}{legal}"
+            f"{cover}{toc}{about}{overview}{oasm_block}{action}{mods}{legal}"
             f"<div class='footer-note'>Formula {FORMULA_VERSION} ({FORMULA_DATE}) · "
-            f"Score por factor = base precia + suma de impactos decimales (min 0) · Overall ponderado "
-            f"(Network/DNS/Patching/IPRep/AppSec x1.2) · "
-            f"{len(issues)} issue(s) con impacto decimal · {overall}/100 ({target_letter}) · "
+            f"Score por factor = base precia + suma de impactos decimales (min 0) · Overall promedio simple v3.0 · "
+            f"{len(issues)} hallazgo(s) con impacto decimal · {overall}/100 ({target_letter}) · "
             f"Datos 100% observados del escaneo ASM (no es calificacion oficial SSC).</div>"
             "</body></html>")
 

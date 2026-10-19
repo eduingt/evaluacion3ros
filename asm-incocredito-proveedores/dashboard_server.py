@@ -19,8 +19,11 @@ import logging
 import os
 import re
 import shutil
+import hmac
+import secrets
 import subprocess
 import sys
+import tempfile
 import threading
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -30,9 +33,10 @@ import log_utils
 
 import aiosqlite
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 WORKDIR = Path(__file__).resolve().parent
@@ -46,6 +50,38 @@ MAX_HISTORY_ITEMS = 80
 SCAN_ID_RE = re.compile(r"^[0-9]{8}_[0-9]{6}_[A-Za-z0-9_.-]+$")
 
 DB_PATH = WORKDIR / "dashboard_workspace" / "scan_history.db"
+
+SECRETS_DIR = Path(os.environ.get("ASM_SECRETS_DIR", r"C:\ProgramData\ASM-Dashboard"))
+TOKEN_FILE = Path(os.environ.get("ASM_TOKEN_FILE", str(SECRETS_DIR / "api_token.txt")))
+TLS_CERT_FILE = Path(os.environ.get("ASM_TLS_CERT", str(SECRETS_DIR / "cert.pem")))
+TLS_KEY_FILE = Path(os.environ.get("ASM_TLS_KEY", str(SECRETS_DIR / "key.pem")))
+
+
+def _load_api_token() -> str:
+    env = os.environ.get("ASM_API_TOKEN", "").strip()
+    if env:
+        return env
+    try:
+        t = TOKEN_FILE.read_text(encoding="utf-8").strip().split()[0]
+        if t:
+            return t
+    except Exception:
+        pass
+    t = secrets.token_urlsafe(32)
+    SECRETS_DIR.mkdir(parents=True, exist_ok=True)
+    TOKEN_FILE.write_text(t + "\n", encoding="utf-8")
+    logging.getLogger("asm_dashboard").warning("ASM_API_TOKEN no configurado: token generado en %s", TOKEN_FILE)
+    return t
+
+
+API_TOKEN = _load_api_token()
+
+
+async def require_token(request: Request) -> None:
+    auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer ") or not hmac.compare_digest(auth[7:].strip(), API_TOKEN):
+        raise HTTPException(401, "Token requerido: Authorization: Bearer <token> (ver api_token.txt en el servidor)")
+
 
 SCAN_JOBS: dict[str, dict] = {}
 
@@ -128,7 +164,7 @@ async def save_factor_history(
 
 
 async def get_scan_history(domain: str, days: int = 30) -> list[dict]:
-    """Obtiene el historial de escaneos para un dominio en los últimos N días."""
+    """Obtiene el historial de escaneos para un dominio en los Ãºltimos N dÃ­as."""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute("""
@@ -376,12 +412,9 @@ async def run_scan_batch_pipeline(domains: list[str], test_type: str = "activo")
     out_json = out_dir / "asm_report.json"
     out_html = out_dir / "asm_report.html"
     out_dash = out_dir / "asm_dashboard.html"
-    informe_html = out_dir / "informe_tpra_estilo_socradar.html"
-    informe_pdf = out_dir / "informe_tpra_estilo_socradar.pdf"
 
     py = sys.executable
     asm_py = WORKDIR / "asm_scan.py"
-    gen_py = WORKDIR / "generate_socradar_style_report.py"
 
     cmd_asm = [
         py,
@@ -422,141 +455,47 @@ async def run_scan_batch_pipeline(domains: list[str], test_type: str = "activo")
         shutil.rmtree(out_dir, ignore_errors=True)
         raise RuntimeError(f"asm_scan.py failed, exit {r1.returncode}\nSTDERR: {(r1.stderr or '')[-2000:]}\nSTDOUT: {(r1.stdout or '')[-2000:]}")
 
-    cmd_gen = [
-        py,
-        str(gen_py),
-        "--asm",
-        str(out_json),
-        "--out",
-        str(informe_html),
-        "--title",
-        f"TPRA - {label}",
-        "--subtitle",
-        "ASM - panel local",
-    ]
-    log.info("Building HTML report ...")
-    r2 = subprocess.run(cmd_gen, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r2.stderr:
-        log.warning("report stderr:\n%s", r2.stderr.rstrip()[-1500:])
-    if r2.returncode != 0:
-        shutil.rmtree(out_dir, ignore_errors=True)
-        raise RuntimeError(f"generate_socradar_style_report.py failed, exit {r2.returncode}\nSTDERR: {(r2.stderr or '')[-2000:]}\nSTDOUT: {(r2.stdout or '')[-2000:]}")
-
-    cibest_py = WORKDIR / "generate_cibest_report.py"
-    cibest_html = out_dir / "informe_grupocibest.html"
-    cibest_pdf = out_dir / "informe_grupocibest.pdf"
-    cmd_cibest = [py, str(cibest_py), "--asm", str(out_json), "--out", str(cibest_html)]
-    log.info("Building Cibest report ...")
-    r3 = subprocess.run(cmd_cibest, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r3.returncode == 0:
-        try:
-            await pdf_from_html(cibest_html, cibest_pdf, log)
-        except Exception as e:
-            log.warning("Cibest PDF skipped: %s", e)
-    else:
-        log.warning("Cibest report skipped: %s", (r3.stderr or "")[-500:])
-
-    bancolombia_py = WORKDIR / "generate_bancolombia_report.py"
-    bancolombia_html = out_dir / "informe_bancolombia.html"
-    bancolombia_pdf = out_dir / "informe_bancolombia.pdf"
-    cmd_bancolombia = [py, str(bancolombia_py), "--asm", str(out_json), "--out", str(bancolombia_html)]
-    log.info("Building Bancolombia report ...")
-    r4 = subprocess.run(cmd_bancolombia, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r4.returncode == 0:
-        try:
-            await pdf_from_html(bancolombia_html, bancolombia_pdf, log)
-        except Exception as e:
-            log.warning("Bancolombia PDF skipped: %s", e)
-    else:
-        log.warning("Bancolombia report skipped: %s", (r4.stderr or "")[-500:])
-
-    scor3bank_py = WORKDIR / "generate_scor3bank_report.py"
-    scor3bank_html = out_dir / "informe_scor3bank.html"
-    scor3bank_pdf = out_dir / "informe_scor3bank.pdf"
-    cmd_scor3bank = [py, str(scor3bank_py), "--asm", str(out_json), "--out", str(scor3bank_html)]
-    log.info("Building SCOR3BANK report ...")
-    r5 = subprocess.run(cmd_scor3bank, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r5.returncode == 0:
-        try:
-            await pdf_from_html(scor3bank_html, scor3bank_pdf, log)
-        except Exception as e:
-            log.warning("SCOR3BANK PDF skipped: %s", e)
-    else:
-        log.warning("SCOR3BANK report skipped: %s", (r5.stderr or "")[-500:])
-
+    log.info("TPRA retired: generator absent, not built.")
+    log.info("Cibest/BETA1/B2 retired: generators absent, not built.")
+    log.info("Bancolombia/SCOR3BANK retired: generators absent, not built.")
     log.info("P/A (Pasivo/Activo) report disabled per request - not generated.")
 
-    beta1_py = WORKDIR / "generate_beta1_report.py"
-    beta1_html = out_dir / "informe_beta1.html"
-    beta1_pdf = out_dir / "informe_beta1.pdf"
-    cmd_beta1 = [py, str(beta1_py), "--asm", str(out_json), "--out", str(beta1_html), "--analista", "Equipo de Ciberseguridad", "--org", "GrupoCibest"]
-    log.info("Building BETA1 report ...")
-    r7 = subprocess.run(cmd_beta1, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r7.returncode == 0:
-        try:
-            await pdf_from_html(beta1_html, beta1_pdf, log)
-        except Exception as e:
-            log.warning("BETA1 PDF skipped: %s", e)
-    else:
-        log.warning("BETA1 report skipped: %s", (r7.stderr or "")[-500:])
-
-    b2_py = WORKDIR / "generate_b2_scorecard_report.py"
-    b2_html = out_dir / "informe_scorecard_b2.html"
-    b2_pdf = out_dir / "informe_scorecard_b2.pdf"
-    cmd_b2 = [py, str(b2_py), "--asm", str(out_json), "--out", str(b2_html), "--analista", "Equipo de Ciberseguridad", "--org", "GrupoCibest"]
-    log.info("Building B2 Scorecard report ...")
-    r8 = subprocess.run(cmd_b2, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r8.returncode == 0:
-        try:
-            await pdf_from_html(b2_html, b2_pdf, log)
-        except Exception as e:
-            log.warning("B2 PDF skipped: %s", e)
-    else:
-        log.warning("B2 report skipped: %s", (r8.stderr or "")[-500:])
-
-    b3_py = WORKDIR / "generate_b3_unified_report.py"
-    b3_html = out_dir / "informe_unificado_b3.html"
-    b3_pdf = out_dir / "informe_unificado_b3.pdf"
-    cmd_b3 = [py, str(b3_py), "--asm", str(out_json), "--out", str(b3_html), "--analista", "@eduingt-ANALISTA INTELIGENCIA Y DEFENSA CIBER", "--org", "GrupoCibest"]
-    log.info("Building B3 Unificado report ...")
-    r9 = subprocess.run(cmd_b3, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r9.returncode == 0:
-        try:
-            from generate_b3_unified_report import paginate_toc
-            paginate_toc(str(b3_html))
-        except Exception as e:
-            log.warning("B3 TOC pagination skipped: %s", e)
-        try:
-            await pdf_from_html(b3_html, b3_pdf, log)
-        except Exception as e:
-            log.warning("B3 PDF skipped: %s", e)
-    else:
-        log.warning("B3 report skipped: %s", (r9.stderr or "")[-500:])
-
-    b4_py = WORKDIR / "generate_b4_unified_report.py"
-    b4_html = out_dir / "informe_unificado_b4.html"
-    b4_pdf = out_dir / "informe_unificado_b4.pdf"
-    cmd_b4 = [py, str(b4_py), "--asm", str(out_json), "--out", str(b4_html), "--analista", "@eduingt-ANALISTA INTELIGENCIA Y DEFENSA CIBER", "--org", "GrupoCibest"]
-    log.info("Building B4 Unificado report (Overall absorbe Score General) ...")
-    r_b4 = subprocess.run(cmd_b4, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r_b4.returncode == 0:
-        try:
-            from generate_b4_unified_report import paginate_toc as paginate_toc_b4
-            paginate_toc_b4(str(b4_html))
-        except Exception as e:
-            log.warning("B4 TOC pagination skipped: %s", e)
-        try:
-            await pdf_from_html(b4_html, b4_pdf, log)
-        except Exception as e:
-            log.warning("B4 PDF skipped: %s", e)
-    else:
-        log.warning("B4 report skipped: %s", (r_b4.stderr or "")[-500:])
+    # Ciclo de vida de hallazgos (1a/ultima vista): se registra ANTES de generar
+    # los informes para que el escaneo actual quede como ultima vista. Unico
+    # escritor de finding_lifecycle; los generadores solo leen.
+    try:
+        import oasm_enrich as _oasm
+        _asm_lc = json.loads(out_json.read_text(encoding="utf-8"))
+        from generate_b5_unified_report import build_findings as _bf5
+        from generate_b6_unified_report import build_findings as _bf6
+        from generate_b7_unified_report import collect_issues as _ci7
+        _when = (_asm_lc.get("generated_utc") or _asm_lc.get("generated_at")
+                 or _asm_lc.get("created_utc") or created)
+        _lc_total = 0
+        for _p in (_asm_lc.get("providers") or []):
+            _dom = _p.get("domain", label)
+            _finds = []
+            _finds += list(_p.get("cve_findings") or [])
+            _finds += list((_p.get("strix") or {}).get("findings") or [])
+            for _fn in (_bf5, _bf6):
+                try:
+                    _finds += list(_fn(_p) or [])
+                except Exception:
+                    pass
+            try:
+                _finds += list(_ci7(_p) or [])
+            except Exception:
+                pass
+            _lc_total += _oasm.record_findings(_dom, _finds, when=_when)
+        log.info("finding_lifecycle: %d hallazgo(s) registrado(s)", _lc_total)
+    except Exception as e:
+        log.warning("finding_lifecycle registration skipped: %s", e)
 
     b5_py = WORKDIR / "generate_b5_unified_report.py"
     b5_html = out_dir / "informe_unificado_b5.html"
     b5_pdf = out_dir / "informe_unificado_b5.pdf"
     cmd_b5 = [py, str(b5_py), "--asm", str(out_json), "--out", str(b5_html), "--analista", "@eduingt-ANALISTA INTELIGENCIA Y DEFENSA CIBER", "--org", "GrupoCibest"]
-    log.info("Building B5 Unificado report (base B3) ...")
+    log.info("Building B5 Unificado report ...")
     r_b5 = subprocess.run(cmd_b5, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
     if r_b5.returncode == 0:
         try:
@@ -604,26 +543,8 @@ async def run_scan_batch_pipeline(domains: list[str], test_type: str = "activo")
     else:
         log.warning("B7 report skipped: %s", (r_b7.stderr or "")[-500:])
 
-    ppasivo_py = WORKDIR / "generate_ppasivo_report.py"
-    ppasivo_html = out_dir / "informe_ppasivo.html"
-    ppasivo_pdf = out_dir / "informe_ppasivo.pdf"
-    cmd_ppasivo = [py, str(ppasivo_py), "--input", str(out_json), "--output", str(ppasivo_html)]
-    log.info("Building Ppasivo report ...")
-    r10 = subprocess.run(cmd_ppasivo, cwd=str(WORKDIR), capture_output=True, text=True, timeout=120)
-    if r10.returncode == 0:
-        try:
-            await pdf_from_html(ppasivo_html, ppasivo_pdf, log)
-        except Exception as e:
-            log.warning("Ppasivo PDF skipped: %s", e)
-    else:
-        log.warning("Ppasivo report skipped: %s", (r10.stderr or "")[-500:])
-
-    log.info("Building PDF ...")
-    try:
-        await pdf_from_html(informe_html, informe_pdf, log)
-    except Exception:
-        shutil.rmtree(out_dir, ignore_errors=True)
-        raise
+    log.info("Ppasivo retired: generator absent, not built.")
+    log.info("TPRA retired: generator absent, not built.")
 
     meta = {"domain": label, "scan_id": scan_id, "created_utc": created}
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -637,7 +558,7 @@ async def run_scan_batch_pipeline(domains: list[str], test_type: str = "activo")
         providers = asm_data.get("providers") or []
         if providers:
             p = providers[0]
-            from generate_b3_unified_report import domain_score, compute_factores
+            from generate_b5_unified_report import domain_score, compute_factores
             dscore = domain_score(p)
             factores = compute_factores(providers)
             score_general = int(sum(f["score"] for f in factores) / max(len(factores), 1)) if factores else 0
@@ -684,29 +605,19 @@ async def run_scan_batch_pipeline(domains: list[str], test_type: str = "activo")
         "domain": label,
         "created_utc": created,
         "log": scan_log_txt,
-        "pdf_url": f"{base}/pdf",
-        "html_url": f"{base}/html",
-        "pdf_grupocibest_url": f"{base}/pdf-grupocibest",
-        "pdf_bancolombia_url": f"{base}/pdf-bancolombia",
-        "pdf_scor3bank_url": f"{base}/pdf-scor3bank",
-        "pdf_beta1_url": f"{base}/pdf-beta1",
-        "pdf_b2_url": f"{base}/pdf-b2",
-        "pdf_b3_url": f"{base}/pdf-b3",
-        "html_b3_url": f"{base}/html-b3",
-        "pdf_b4_url": f"{base}/pdf-b4",
-        "html_b4_url": f"{base}/html-b4",
+        "pdf_url": f"{base}/pdf-b5",
+        "html_url": f"{base}/html-b5",
         "pdf_b5_url": f"{base}/pdf-b5",
         "html_b5_url": f"{base}/html-b5",
         "pdf_b6_url": f"{base}/pdf-b6",
         "html_b6_url": f"{base}/html-b6",
         "pdf_b7_url": f"{base}/pdf-b7",
         "html_b7_url": f"{base}/html-b7",
-        "pdf_ppasivo_url": f"{base}/pdf-ppasivo",
-        "html_ppasivo_url": f"{base}/html-ppasivo",
     }
 
 
 app = FastAPI(title="ASM Dashboard", version="1.0")
+app.mount("/static", StaticFiles(directory=WORKDIR / "static"), name="static")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:3001", "http://localhost:3001", "http://127.0.0.1:3000", "http://localhost:3000"],
@@ -743,7 +654,7 @@ class ScanRequest(BaseModel):
 
 
 @app.post("/api/scan")
-async def api_scan(body: ScanRequest) -> dict:
+async def api_scan(body: ScanRequest, _: None = Depends(require_token)) -> dict:
     domain = normalize_domain(body.domain)
     if not domain:
         raise HTTPException(400, "Empty domain")
@@ -780,6 +691,7 @@ def parse_domains_txt(text: str) -> list[str]:
 async def api_scan_batch(
     file: UploadFile = File(...),
     test_type: str = Form("activo"),
+    _: None = Depends(require_token),
 ) -> dict:
     if test_type not in ("pasivo", "semi-activo", "activo", "invasivo"):
         raise HTTPException(400, "test_type invalido")
@@ -822,7 +734,7 @@ def api_scan_status(job_id: str) -> JSONResponse:
 
 
 @app.post("/api/history/{scan_id}/delete")
-def api_delete_history(scan_id: str) -> JSONResponse:
+def api_delete_history(scan_id: str, _: None = Depends(require_token)) -> JSONResponse:
     if not SCAN_ID_RE.match(scan_id):
         raise HTTPException(400, "scan_id invalido")
     d = HISTORY / scan_id
@@ -839,32 +751,76 @@ def api_delete_history(scan_id: str) -> JSONResponse:
 @app.get("/api/history")
 def api_history() -> JSONResponse:
     items = sync_history_index()
+    try:
+        from precia_scorecard import detect_industry as _ind, factor_scores as _fscores, overall_score as _oscore
+    except Exception:
+        _ind = _fscores = _oscore = None
+    try:
+        from generate_b6_unified_report import build_findings as _findings
+    except Exception:
+        _findings = None
     enriched = []
     for it in items:
         sid = it.get("scan_id", "")
         if not sid or not SCAN_ID_RE.match(sid):
             continue
         d = HISTORY / sid
+        has_any_pdf = any((d / f"informe_unificado_b{i}.pdf").is_file() for i in range(5, 8))
+        has_any_html = any((d / f"informe_unificado_b{i}.html").is_file() for i in range(5, 8))
+        pdf_url, html_url = "", ""
+        for i in (6, 7, 5):
+            if (d / f"informe_unificado_b{i}.pdf").is_file():
+                pdf_url = f"/api/history/{sid}/pdf-b{i}"
+                break
+        for i in (6, 7, 5):
+            if (d / f"informe_unificado_b{i}.html").is_file():
+                html_url = f"/api/history/{sid}/html-b{i}"
+                break
+        sector, score, riesgos, hallazgos_n = "â€”", None, None, None
+        _empresa = str(it.get("domain", "") or "")
+        try:
+            _asm = json.loads((d / "asm_report.json").read_text(encoding="utf-8"))
+            _provs = _asm.get("providers") or []
+            if _provs:
+                _p0 = _provs[0]
+                _empresa = str(_p0.get("name", "") or _empresa)[:60]
+                if _ind is not None:
+                    sector = str(_ind(_p0) or "â€”")[:24]
+                if _fscores is not None and _oscore is not None:
+                    score = int(_oscore(_fscores(_p0)))
+                if _findings is not None:
+                    _sev_order = ["CRITICA", "ALTA", "MEDIA", "BAJA", "INFORMATIVA", "INFO"]
+                    _sev_lbl = {"CRITICA": "CrÃ­ticos", "ALTA": "Altos", "MEDIA": "Medios",
+                                "BAJA": "Bajos", "INFORMATIVA": "Informativos", "INFO": "Informativos"}
+                    _counts: dict[str, int] = {}
+                    for _f in _findings(_p0):
+                        _s = str(_f.get("severidad", "")).upper()
+                        _counts[_s] = _counts.get(_s, 0) + 1
+                    hallazgos_n = sum(_counts.values())
+                    for _s in _sev_order:
+                        if _counts.get(_s, 0) > 0:
+                            riesgos = f"{_counts[_s]} {_sev_lbl[_s]}"
+                            break
+        except Exception:
+            pass
         enriched.append(
             {
                 **it,
-                "has_pdf": (d / "informe_tpra_estilo_socradar.pdf").is_file(),
-                "has_beta1_pdf": (d / "informe_beta1.pdf").is_file(),
-                "has_b2_pdf": (d / "informe_scorecard_b2.pdf").is_file(),
-                "has_b3_pdf": (d / "informe_unificado_b3.pdf").is_file(),
-                "has_b3_html": (d / "informe_unificado_b3.html").is_file(),
-                "has_b4_pdf": (d / "informe_unificado_b4.pdf").is_file(),
-                "has_b4_html": (d / "informe_unificado_b4.html").is_file(),
+                "empresa": _empresa,
+                "sector": sector,
+                "score": score,
+                "riesgos": riesgos,
+                "hallazgos_n": hallazgos_n,
                 "has_b5_pdf": (d / "informe_unificado_b5.pdf").is_file(),
                 "has_b5_html": (d / "informe_unificado_b5.html").is_file(),
                 "has_b6_pdf": (d / "informe_unificado_b6.pdf").is_file(),
                 "has_b6_html": (d / "informe_unificado_b6.html").is_file(),
                 "has_b7_pdf": (d / "informe_unificado_b7.pdf").is_file(),
                 "has_b7_html": (d / "informe_unificado_b7.html").is_file(),
-                "has_ppasivo_pdf": (d / "informe_ppasivo.pdf").is_file(),
-                "has_html": (d / "informe_tpra_estilo_socradar.html").is_file(),
-                "pdf_url": f"/api/history/{sid}/pdf",
-                "html_url": f"/api/history/{sid}/html",
+                "has_pdf": has_any_pdf,
+                "has_html": has_any_html,
+                "pdf_url": pdf_url,
+                "html_url": html_url,
             }
         )
     return JSONResponse(
@@ -875,7 +831,7 @@ def api_history() -> JSONResponse:
 
 @app.get("/api/history/{domain}/scores")
 async def api_scan_history(domain: str, days: int = 30):
-    """Historial de scores para un dominio (últimos N días)."""
+    """Historial de scores para un dominio (Ãºltimos N dÃ­as)."""
     try:
         history = await get_scan_history(domain, days)
         return JSONResponse(
@@ -893,96 +849,6 @@ def _meta_domain() -> str:
         return str(json.loads(META_FILE.read_text(encoding="utf-8")).get("domain", "scan"))
     except Exception:
         return "scan"
-
-
-@app.get("/api/download/pdf")
-def download_pdf() -> FileResponse:
-    p = LAST / "informe_tpra_estilo_socradar.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "No PDF yet. Run a scan first.")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_tpra_{safe}.pdf")
-
-
-@app.get("/api/download/pdf-grupocibest")
-def download_pdf_grupocibest() -> FileResponse:
-    p = WORKDIR / "informe_grupocibest.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF no disponible. Ejecuta: python generate_cibest_report.py")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_grupocibest_{safe}.pdf")
-
-
-@app.get("/api/download/pdf-bancolombia")
-def download_pdf_bancolombia() -> FileResponse:
-    p = WORKDIR / "informe_bancolombia.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF no disponible. Ejecuta: python generate_bancolombia_report.py")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_bancolombia_{safe}.pdf")
-
-
-@app.get("/api/download/pdf-scor3bank")
-def download_pdf_scor3bank() -> FileResponse:
-    p = WORKDIR / "informe_scor3bank.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF no disponible. Ejecuta: python generate_scor3bank_report.py")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_scor3bank_{safe}.pdf")
-
-
-@app.get("/api/download/pdf-beta1")
-def download_pdf_beta1() -> FileResponse:
-    p = LAST / "informe_beta1.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF beta1 no disponible. Ejecuta un escaneo primero.")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_beta1_{safe}.pdf")
-
-
-@app.get("/api/download/pdf-b2")
-def download_pdf_b2() -> FileResponse:
-    p = LAST / "informe_scorecard_b2.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF B2 (Scorecard) no disponible. Ejecuta un escaneo primero.")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_b2_scorecard_{safe}.pdf")
-
-
-@app.get("/api/download/pdf-b3")
-def download_pdf_b3() -> FileResponse:
-    p = LAST / "informe_unificado_b3.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF B3 (Unificado) no disponible. Ejecuta un escaneo primero.")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_b3_unificado_{safe}.pdf")
-
-
-@app.get("/api/download/html-b3")
-def download_html_b3() -> FileResponse:
-    p = LAST / "informe_unificado_b3.html"
-    if not p.is_file():
-        raise HTTPException(404, "HTML B3 (Unificado) no disponible. Ejecuta un escaneo primero.")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_b3_unificado_{safe}.html")
-
-
-@app.get("/api/download/pdf-b4")
-def download_pdf_b4() -> FileResponse:
-    p = LAST / "informe_unificado_b4.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF B4 (Unificado) no disponible. Ejecuta un escaneo primero.")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_b4_unificado_{safe}.pdf")
-
-
-@app.get("/api/download/html-b4")
-def download_html_b4() -> FileResponse:
-    p = LAST / "informe_unificado_b4.html"
-    if not p.is_file():
-        raise HTTPException(404, "HTML B4 (Unificado) no disponible. Ejecuta un escaneo primero.")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_b4_unificado_{safe}.html")
 
 
 @app.get("/api/download/pdf-b5")
@@ -1039,153 +905,35 @@ def download_html_b7() -> FileResponse:
     return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_b7_detallado_{safe}.html")
 
 
-@app.get("/api/download/pdf-ppasivo")
-def download_pdf_ppasivo() -> FileResponse:
-    p = LAST / "informe_ppasivo.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF Ppasivo no disponible. Ejecuta un escaneo primero.")
+@app.get("/api/download/sarif")
+def download_sarif() -> FileResponse:
+    from generate_sarif_export import build_sarif_log
+    asm = json.loads((LAST / "asm_report.json").read_text(encoding="utf-8"))
+    log = build_sarif_log(asm)
     safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_ppasivo_{safe}.pdf")
+    tmp = Path(tempfile.gettempdir()) / f"asm_sarif_{safe}.json"
+    tmp.write_text(json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8")
+    return FileResponse(tmp, media_type="application/json", filename=f"asm_sarif_{safe}.json")
 
 
-@app.get("/api/download/html-ppasivo")
-def download_html_ppasivo() -> FileResponse:
-    p = LAST / "informe_ppasivo.html"
-    if not p.is_file():
-        raise HTTPException(404, "HTML Ppasivo no disponible. Ejecuta un escaneo primero.")
+@app.get("/api/download/vex")
+def download_vex() -> FileResponse:
+    from generate_vex_export import build_vex_doc
+    asm = json.loads((LAST / "asm_report.json").read_text(encoding="utf-8"))
+    doc = build_vex_doc(asm)
     safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_ppasivo_{safe}.html")
+    tmp = Path(tempfile.gettempdir()) / f"asm_vex_{safe}.json"
+    tmp.write_text(json.dumps(doc, indent=2, ensure_ascii=False), encoding="utf-8")
+    return FileResponse(tmp, media_type="application/json", filename=f"asm_vex_{safe}.json")
 
 
-@app.get("/api/download/html")
-def download_html() -> FileResponse:
-    p = LAST / "informe_tpra_estilo_socradar.html"
-    if not p.is_file():
-        raise HTTPException(404, "No HTML report.")
-    safe = re.sub(r"[^\w.-]+", "_", _meta_domain())[:80]
-    return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_tpra_{safe}.html")
-
-
-@app.get("/api/history/{scan_id}/pdf")
-def history_pdf(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_tpra_estilo_socradar.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF not found for this scan.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_tpra_{dom}_{scan_id}.pdf")
-
-
-@app.get("/api/history/{scan_id}/pdf-grupocibest")
-def history_pdf_grupocibest(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_grupocibest.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF ver.grupocibest no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_grupocibest_{dom}_{scan_id}.pdf")
-
-
-@app.get("/api/history/{scan_id}/pdf-bancolombia")
-def history_pdf_bancolombia(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_bancolombia.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF ver.bancolombia no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_bancolombia_{dom}_{scan_id}.pdf")
-
-
-@app.get("/api/history/{scan_id}/pdf-scor3bank")
-def history_pdf_scor3bank(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_scor3bank.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF ver.scor3bank no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_scor3bank_{dom}_{scan_id}.pdf")
-
-
-@app.get("/api/history/{scan_id}/pdf-beta1")
-def history_pdf_beta1(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_beta1.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF beta1 no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_beta1_{dom}_{scan_id}.pdf")
-
-
-@app.get("/api/history/{scan_id}/pdf-b2")
-def history_pdf_b2(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_scorecard_b2.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF B2 (Scorecard) no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_b2_scorecard_{dom}_{scan_id}.pdf")
-
-
-@app.get("/api/history/{scan_id}/pdf-b3")
-def history_pdf_b3(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_unificado_b3.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF B3 (Unificado) no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_b3_unificado_{dom}_{scan_id}.pdf")
-
-
-@app.get("/api/history/{scan_id}/html-b3")
-def history_html_b3(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_unificado_b3.html"
-    if not p.is_file():
-        raise HTTPException(404, "HTML B3 (Unificado) no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_b3_unificado_{dom}_{scan_id}.html")
-
-
-@app.get("/api/history/{scan_id}/pdf-b4")
-def history_pdf_b4(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_unificado_b4.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF B4 (Unificado) no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_b4_unificado_{dom}_{scan_id}.pdf")
-
-
-@app.get("/api/history/{scan_id}/html-b4")
-def history_html_b4(scan_id: str) -> FileResponse:
-    d = _history_dir(scan_id)
-    p = d / "informe_unificado_b4.html"
-    if not p.is_file():
-        raise HTTPException(404, "HTML B4 (Unificado) no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_b4_unificado_{dom}_{scan_id}.html")
-
-
+@app.get("/api/download/sbom")
+def download_sbom() -> FileResponse:
+    from generate_sbom_export import build_sbom_doc
+    doc = build_sbom_doc()
+    tmp = Path(tempfile.gettempdir()) / "asm_sbom.json"
+    tmp.write_text(json.dumps(doc, indent=2, ensure_ascii=False), encoding="utf-8")
+    return FileResponse(tmp, media_type="application/json", filename="asm_sbom.json")
 
 
 @app.get("/api/history/{scan_id}/pdf-b5")
@@ -1260,40 +1008,46 @@ def history_html_b7(scan_id: str) -> FileResponse:
     return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_b7_detallado_{dom}_{scan_id}.html")
 
 
-@app.get("/api/history/{scan_id}/pdf-ppasivo")
-def history_pdf_ppasivo(scan_id: str) -> FileResponse:
+@app.get("/api/history/{scan_id}/sarif")
+def history_sarif(scan_id: str) -> FileResponse:
+    from generate_sarif_export import build_sarif_log
     d = _history_dir(scan_id)
-    p = d / "informe_ppasivo.pdf"
-    if not p.is_file():
-        raise HTTPException(404, "PDF Ppasivo no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="application/pdf", filename=f"asm_ppasivo_{dom}_{scan_id}.pdf")
+    asm = json.loads((d / "asm_report.json").read_text(encoding="utf-8"))
+    dom = safe_scan_id_part(str(asm.get("domain", scan_id)))[:60]
+    tmp = Path(tempfile.gettempdir()) / f"asm_sarif_{dom}_{scan_id}.json"
+    tmp.write_text(json.dumps(build_sarif_log(asm), indent=2, ensure_ascii=False), encoding="utf-8")
+    return FileResponse(tmp, media_type="application/json", filename=f"asm_sarif_{dom}_{scan_id}.json")
 
 
-@app.get("/api/history/{scan_id}/html-ppasivo")
-def history_html_ppasivo(scan_id: str) -> FileResponse:
+@app.get("/api/history/{scan_id}/vex")
+def history_vex(scan_id: str) -> FileResponse:
+    from generate_vex_export import build_vex_doc
     d = _history_dir(scan_id)
-    p = d / "informe_ppasivo.html"
-    if not p.is_file():
-        raise HTTPException(404, "HTML Ppasivo no encontrado.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_ppasivo_{dom}_{scan_id}.html")
+    asm = json.loads((d / "asm_report.json").read_text(encoding="utf-8"))
+    dom = safe_scan_id_part(str(asm.get("domain", scan_id)))[:60]
+    tmp = Path(tempfile.gettempdir()) / f"asm_vex_{dom}_{scan_id}.json"
+    tmp.write_text(json.dumps(build_vex_doc(asm), indent=2, ensure_ascii=False), encoding="utf-8")
+    return FileResponse(tmp, media_type="application/json", filename=f"asm_vex_{dom}_{scan_id}.json")
+
+
+@app.get("/api/history/{scan_id}/pdf")
+def history_pdf(scan_id: str) -> FileResponse:
+    d = _history_dir(scan_id)
+    for i in (6, 7, 5):
+        p = d / f"informe_unificado_b{i}.pdf"
+        if p.is_file():
+            return FileResponse(p, media_type="application/pdf")
+    raise HTTPException(404, "PDF no encontrado.")
 
 
 @app.get("/api/history/{scan_id}/html")
 def history_html(scan_id: str) -> FileResponse:
     d = _history_dir(scan_id)
-    p = d / "informe_tpra_estilo_socradar.html"
-    if not p.is_file():
-        raise HTTPException(404, "HTML not found.")
-    dom = safe_scan_id_part(
-        str(json.loads((d / "meta.json").read_text(encoding="utf-8")).get("domain", scan_id))
-    )[:60]
-    return FileResponse(p, media_type="text/html; charset=utf-8", filename=f"informe_tpra_{dom}_{scan_id}.html")
+    for i in (6, 7, 5):
+        p = d / f"informe_unificado_b{i}.html"
+        if p.is_file():
+            return FileResponse(p, media_type="text/html; charset=utf-8")
+    raise HTTPException(404, "HTML no encontrado.")
 
 
 CONFIG_FILE = WORKDIR / "integrations_config.json"
@@ -1324,7 +1078,7 @@ class ConfigUpdate(BaseModel):
     key2: str = ""
 
 @app.put("/api/config/{integration_id}")
-def put_config(integration_id: str, body: ConfigUpdate) -> JSONResponse:
+def put_config(integration_id: str, body: ConfigUpdate, _: None = Depends(require_token)) -> JSONResponse:
     if not CONFIG_FILE.is_file():
         raise HTTPException(404, "integrations_config.json not found")
     raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
@@ -1366,7 +1120,7 @@ def main() -> None:
         type=int,
         default=int(os.environ.get("ASM_DASHBOARD_PORT", "8765")),
     )
-    ap.add_argument("--ssl", action="store_true", help="Habilitar HTTPS con cert.pem/key.pem")
+    ap.add_argument("--ssl", action="store_true", help="Habilitar HTTPS (ASM_TLS_CERT/ASM_TLS_KEY o C:\\ProgramData\\ASM-Dashboard\\cert.pem|key.pem)")
     args = ap.parse_args()
     proto = "https" if args.ssl else "http"
     print(f"Panel ASM: {proto}://{args.host}:{args.port}/")
@@ -1374,7 +1128,9 @@ def main() -> None:
         print("ADVERTENCIA: escuchando en todas las interfaces.")
     ssl_kw = {}
     if args.ssl:
-        ssl_kw = {"ssl_certfile": str(WORKDIR / "cert.pem"), "ssl_keyfile": str(WORKDIR / "key.pem")}
+        if not TLS_CERT_FILE.is_file() or not TLS_KEY_FILE.is_file():
+            ap.error(f"falta TLS: {TLS_CERT_FILE} o {TLS_KEY_FILE} (ver SECURITY.md)")
+        ssl_kw = {"ssl_certfile": str(TLS_CERT_FILE), "ssl_keyfile": str(TLS_KEY_FILE)}
     uvicorn.run(app, host=args.host, port=args.port, log_level="info", **ssl_kw)
 
 

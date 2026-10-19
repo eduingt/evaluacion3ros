@@ -1,3 +1,6 @@
-requests>=2.28.0
-dnspython>=2.4.0
+# Dependencias pineadas a versiones probadas en .venv (2026-10-13).
+# NOTA: se pedia dnspython>=2.4.0 pero el entorno probado lleva 2.3.0;
+# pendiente actualizar a >=2.4.0 y re-probar antes de subir el pin.
+requests==2.31.0
+dnspython==2.3.0
 # Opcional — OrgASM (https://github.com/ugomeguerditchian/OrgASM): pip install -r OrgASM/requirements.txt
